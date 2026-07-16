@@ -1,0 +1,13 @@
+{
+  "events": [
+    {
+      "id": "1365-1001",
+      "title": "한강 공원 쓰레기 줍기",
+      "translatedTitle": "Han River Park Cleanup",
+      "organization": "Seoul Environment Group",
+      "category": "Environment",
+      "status": "Recruiting",
+      "location": { "lat": 37.528, "lng": 126.934, "address": "Yeouido Han River Park" }
+    }
+  ]
+}
