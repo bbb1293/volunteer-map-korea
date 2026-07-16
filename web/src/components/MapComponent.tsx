@@ -15,6 +15,61 @@ interface VolunteerEvent {
   };
 }
 
+// Category -> group mapping. Each of the ~16 API categories folds into one of
+// 5 groups so the map uses a validated 4-hue categorical palette (+ neutral
+// "Other") rather than 16 indistinguishable colors.
+type CategoryGroup = 'education' | 'environment' | 'health' | 'safety' | 'other';
+
+const CATEGORY_GROUPS: Record<string, CategoryGroup> = {
+  'Education': 'education',
+  'Counseling & Mentoring': 'education',
+  'Volunteer Basic Training': 'education',
+  'Environment': 'environment',
+  'Housing & Environment': 'environment',
+  'Rural Community': 'environment',
+  'Health & Medical': 'health',
+  'Living Support': 'health',
+  'Community Safety': 'safety',
+  'Human Rights & Public Interest': 'safety',
+  'Disaster Relief': 'safety',
+  'Administration': 'safety',
+};
+
+function getCategoryGroup(category?: string): CategoryGroup {
+  return (category && CATEGORY_GROUPS[category]) || 'other';
+}
+
+// Validated categorical palette (dataviz skill): the first 4 slots (blue,
+// green, magenta, yellow) pass all-pairs CVD/contrast checks; "other" uses a
+// neutral gray rather than a 5th competing hue.
+const GROUP_STYLES: Record<CategoryGroup, { color: string; label: string; icon: string }> = {
+  education: {
+    color: '#2a78d6',
+    label: 'Education & Mentoring',
+    icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>',
+  },
+  environment: {
+    color: '#008300',
+    label: 'Environment & Nature',
+    icon: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 3.5 1 8a8.5 8.5 0 0 1-9 10Z"></path><path d="M19 2c-2.26 4.33-5.27 7.14-8 10"></path>',
+  },
+  health: {
+    color: '#e87ba4',
+    label: 'Health & Care',
+    icon: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 1 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>',
+  },
+  safety: {
+    color: '#eda100',
+    label: 'Safety & Public Service',
+    icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>',
+  },
+  other: {
+    color: '#898781',
+    label: 'Other',
+    icon: '<path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.83 3H4a1 1 0 0 0-1 1v5.83a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.59-4.59a2 2 0 0 0 0-2.83z"></path><circle cx="7.5" cy="7.5" r="1.5" fill="white" stroke="none"></circle>',
+  },
+};
+
 export default function MapComponent() {
   const mapRef = useRef<HTMLDivElement>(null);
   const [map, setMap] = useState<google.maps.Map | null>(null);
@@ -24,7 +79,11 @@ export default function MapComponent() {
   const [isTranslating, setIsTranslating] = useState(false);
   const [clickedCount, setClickedCount] = useState(0);
   const [isLocating, setIsLocating] = useState(false);
+  const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
+  const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+  const userMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const hasCenteredOnUser = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -54,27 +113,6 @@ export default function MapComponent() {
         setMap(newMap);
         mapInitialized.current = true;
 
-        // Automatically request user coordinates on initialization and center/zoom on them
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            (position) => {
-              if (!active) return;
-              const pos = {
-                lat: position.coords.latitude,
-                lng: position.coords.longitude,
-              };
-              newMap.setCenter(pos);
-              newMap.setZoom(14);
-            },
-            (error) => {
-              if (!active) return;
-              console.log('Geolocation on initialization denied/failed:', error.message);
-              // Fallback is already Seoul, which the map is initialized with.
-            },
-            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-          );
-        }
-
         fetch('/api/volunteers')
           .then((res) => res.json())
           .then((data) => {
@@ -88,13 +126,11 @@ export default function MapComponent() {
                 ) {
                   const pinContainer = document.createElement('div');
                   pinContainer.className = 'custom-map-pin';
-                  const isEnv = event.category === 'Environment';
-                  const pinColor = isEnv ? '#10b981' : '#8b5cf6';
+                  const groupStyle = GROUP_STYLES[getCategoryGroup(event.category)];
+                  const pinColor = groupStyle.color;
                   pinContainer.style.setProperty('--pin-color', pinColor);
 
-                  const svgIcon = isEnv
-                    ? `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 3.5 1 8a8.5 8.5 0 0 1-9 10Z"></path><path d="M19 2c-2.26 4.33-5.27 7.14-8 10"></path></svg>`
-                    : `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`;
+                  const svgIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">${groupStyle.icon}</svg>`;
 
                   pinContainer.innerHTML = `
                     <div class="pin-pulse" style="background-color: ${pinColor}"></div>
@@ -114,10 +150,25 @@ export default function MapComponent() {
 
                   marker.addListener('click', () => {
                     setSelectedEvent(event);
+                    setShareStatus('idle');
                     setClickedCount((prev) => prev + 1);
                   });
                 }
               });
+
+              // If this page was opened via a shared link (?event=<id>), open
+              // that event's card and center the map on it instead of the
+              // default/geolocation center.
+              const sharedId = new URLSearchParams(window.location.search).get('event');
+              if (sharedId) {
+                const sharedEvent = data.events.find((e: VolunteerEvent) => e.id === sharedId);
+                if (sharedEvent?.location) {
+                  setSelectedEvent(sharedEvent);
+                  newMap.setCenter({ lat: sharedEvent.location.lat, lng: sharedEvent.location.lng });
+                  newMap.setZoom(16);
+                  hasCenteredOnUser.current = true; // don't let geolocation override the shared spot
+                }
+              }
             }
           })
           .catch((err) => {
@@ -150,6 +201,56 @@ export default function MapComponent() {
       markersRef.current = [];
     };
   }, []);
+
+  // Live-track the user's position with a Google-style pulsing blue dot,
+  // and center the map on the first fix.
+  useEffect(() => {
+    if (!map || !navigator.geolocation) return;
+
+    const watchId = navigator.geolocation.watchPosition(
+      (position) => {
+        const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
+        setUserPos(pos);
+
+        if (userMarkerRef.current) {
+          userMarkerRef.current.position = pos;
+        } else {
+          const pinContainer = document.createElement('div');
+          pinContainer.className = 'user-position-pin';
+          pinContainer.innerHTML = `
+            <div class="user-position-pulse"></div>
+            <div class="user-position-core"></div>
+          `;
+          userMarkerRef.current = new google.maps.marker.AdvancedMarkerElement({
+            map,
+            position: pos,
+            title: 'Your location',
+            content: pinContainer,
+            zIndex: 500,
+          });
+        }
+
+        if (!hasCenteredOnUser.current) {
+          map.setCenter(pos);
+          map.setZoom(14);
+          hasCenteredOnUser.current = true;
+        }
+      },
+      (error) => {
+        console.log('Geolocation watch denied/failed:', error.message);
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+
+    return () => {
+      navigator.geolocation.clearWatch(watchId);
+      if (userMarkerRef.current) {
+        userMarkerRef.current.map = null;
+        userMarkerRef.current = null;
+      }
+      hasCenteredOnUser.current = false;
+    };
+  }, [map]);
 
   const handleTranslate = async () => {
     if (!selectedEvent) return;
@@ -190,29 +291,68 @@ export default function MapComponent() {
 
   const handleLocate = () => {
     if (!map) return;
-    setIsLocating(true);
-    if (navigator.geolocation) {
-      navigator.geolocation.getCurrentPosition(
-        (position) => {
-          const pos = {
-            lat: position.coords.latitude,
-            lng: position.coords.longitude,
-          };
-          map.panTo(pos);
-          map.setZoom(14);
-          setIsLocating(false);
-        },
-        (error) => {
-          console.error('Error getting location:', error);
-          alert('Could not retrieve your location. Please check your browser permissions.');
-          setIsLocating(false);
-        },
-        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
-      );
-    } else {
-      alert('Geolocation is not supported by your browser.');
-      setIsLocating(false);
+    if (userPos) {
+      map.panTo(userPos);
+      map.setZoom(14);
+      return;
     }
+    if (!navigator.geolocation) {
+      alert('Geolocation is not supported by your browser.');
+      return;
+    }
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
+        map.panTo(pos);
+        map.setZoom(14);
+        setIsLocating(false);
+      },
+      (error) => {
+        console.error('Error getting location:', error);
+        alert('Could not retrieve your location. Please check your browser permissions.');
+        setIsLocating(false);
+      },
+      { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+    );
+  };
+
+  const handleShare = async () => {
+    if (!selectedEvent) return;
+    const url = `${window.location.origin}${window.location.pathname}?event=${encodeURIComponent(selectedEvent.id)}`;
+
+    if (navigator.share) {
+      try {
+        await navigator.share({
+          title: selectedEvent.translatedTitle || selectedEvent.title,
+          text: 'Check out this volunteer opportunity on Volunteer Map Korea!',
+          url,
+        });
+        return;
+      } catch {
+        // User cancelled the native share sheet or it failed; fall back to clipboard.
+      }
+    }
+
+    try {
+      await navigator.clipboard.writeText(url);
+      setShareStatus('copied');
+      setTimeout(() => setShareStatus('idle'), 2000);
+    } catch {
+      alert(`Could not copy automatically. Here's the link:\n${url}`);
+    }
+  };
+
+  // Haversine distance in km between the user and a volunteer event.
+  const getDistanceKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
+    const R = 6371;
+    const dLat = ((b.lat - a.lat) * Math.PI) / 180;
+    const dLng = ((b.lng - a.lng) * Math.PI) / 180;
+    const lat1 = (a.lat * Math.PI) / 180;
+    const lat2 = (b.lat * Math.PI) / 180;
+    const h =
+      Math.sin(dLat / 2) ** 2 + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLng / 2) ** 2;
+    return R * 2 * Math.atan2(Math.sqrt(h), Math.sqrt(1 - h));
   };
 
   return (
@@ -248,6 +388,16 @@ export default function MapComponent() {
         </svg>
       </button>
 
+      {/* Category Color Legend */}
+      <div className="category-legend">
+        {(Object.keys(GROUP_STYLES) as CategoryGroup[]).map((group) => (
+          <div key={group} className="legend-row">
+            <span className="legend-dot" style={{ backgroundColor: GROUP_STYLES[group].color }} />
+            <span className="legend-label">{GROUP_STYLES[group].label}</span>
+          </div>
+        ))}
+      </div>
+
       {/* Gamification Badges Overlay */}
       <div className="badge-overlay">
         <h3 className="badge-overlay-title">Volunteer Impact Badges</h3>
@@ -279,8 +429,17 @@ export default function MapComponent() {
           <h2 style={{ fontSize: '18px', margin: '0 0 8px 0', paddingRight: '20px' }}>
             {selectedEvent.title}
           </h2>
-          <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#334155', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>
+            <span
+              className="legend-dot"
+              style={{ backgroundColor: GROUP_STYLES[getCategoryGroup(selectedEvent.category)].color }}
+            />
             {selectedEvent.category || 'Volunteer Opportunity'}
+            {userPos && selectedEvent.location && (
+              <span style={{ color: '#64748b', fontWeight: 500, textTransform: 'none' }}>
+                {' '}· {getDistanceKm(userPos, selectedEvent.location).toFixed(1)} km away
+              </span>
+            )}
           </div>
           <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
             <strong>Org:</strong> {selectedEvent.organization || 'N/A'}
@@ -288,13 +447,18 @@ export default function MapComponent() {
           <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
             <strong>Address:</strong> {selectedEvent.location?.address || 'N/A'}
           </div>
-          <button
-            className="btn-translate"
-            onClick={handleTranslate}
-            disabled={isTranslating}
-          >
-            {isTranslating ? 'Translating...' : 'Translate with Gemini AI'}
-          </button>
+          <div className="card-actions">
+            <button
+              className="btn-translate"
+              onClick={handleTranslate}
+              disabled={isTranslating}
+            >
+              {isTranslating ? 'Translating...' : 'Translate with Gemini AI'}
+            </button>
+            <button className="btn-share" onClick={handleShare}>
+              {shareStatus === 'copied' ? 'Link Copied!' : 'Share'}
+            </button>
+          </div>
         </div>
       )}
     </div>

@@ -4,6 +4,46 @@ import mockData from '@/data/seoul_volunteers.json';
 // In-memory geocoding cache to avoid redundant expensive API lookups
 const geocodeCache = new Map<string, { lat: number; lng: number } | null>();
 
+// Each listing requires its own detail-endpoint call for coordinates, and
+// dev-tier data.go.kr keys are quota-limited (~1,000 req/day). A 2-hour cache
+// keeps a 100-item batch (101 requests/refresh) well within that budget while
+// still refreshing often enough for a live demo.
+const EVENTS_CACHE_TTL_MS = 2 * 60 * 60 * 1000;
+let eventsCache: { events: unknown[]; fetchedAt: number } | null = null;
+
+// 행정안전부_봉사참여정보서비스_GW (data.go.kr publicDataPk=15157582) returns the
+// category as this Korean display text directly in srvcClCode (not a numeric code).
+const CATEGORY_NAMES: Record<string, string> = {
+  '생활편의': 'Living Support',
+  '주거환경': 'Housing & Environment',
+  '상담ㆍ멘토링': 'Counseling & Mentoring',
+  '교육': 'Education',
+  '보건ㆍ의료': 'Health & Medical',
+  '농어촌 봉사': 'Rural Community',
+  '문화ㆍ체육ㆍ예술ㆍ관광': 'Culture, Sports & Tourism',
+  '환경ㆍ생태계보호': 'Environment',
+  '사무행정': 'Administration',
+  '지역안전ㆍ보호': 'Community Safety',
+  '인권ㆍ공익': 'Human Rights & Public Interest',
+  '재난ㆍ재해': 'Disaster Relief',
+  '국제협력ㆍ해외봉사': 'International Cooperation',
+  '기타': 'Other',
+  '자원봉사 기본교육': 'Volunteer Basic Training',
+  '온라인자원봉사': 'Online Volunteering',
+};
+
+// Parses the government API's "위도,경도" coordinate string (delimiter observed
+// to vary, so accept comma/semicolon/whitespace) into { lat, lng }.
+function parseAreaLalo(raw: string | undefined): { lat: number; lng: number } | null {
+  if (!raw) return null;
+  const parts = raw.split(/[,;\s]+/).map((p) => parseFloat(p)).filter((n) => !isNaN(n));
+  if (parts.length < 2) return null;
+  const [lat, lng] = parts;
+  // Sanity-check against South Korea's bounding box.
+  if (lat < 33 || lat > 39 || lng < 124 || lng > 132) return null;
+  return { lat, lng };
+}
+
 // Helper to decode basic XML entities and strip CDATA
 function decodeXmlEntities(str: string): string {
   let val = str.trim();
@@ -85,10 +125,18 @@ export async function GET() {
     return NextResponse.json(mockData);
   }
 
+  // 1b. Serve from cache if it's still fresh, to stay within the daily API quota.
+  if (eventsCache && Date.now() - eventsCache.fetchedAt < EVENTS_CACHE_TTL_MS) {
+    return NextResponse.json({ events: eventsCache.events });
+  }
+
   try {
-    // 2. Fetch live volunteer opportunity XML listings
+    // 2. Fetch live volunteer opportunity XML listings via the data.go.kr gateway
+    // (행정안전부_봉사참여정보서비스_GW, publicDataPk=15157582)
     const hasPercent = serviceKey.includes('%');
-    const url = `http://openapi.1365.go.kr/openapi/service/rest/VolunteerrecruitService/getVltrSearchWordList?serviceKey=${hasPercent ? serviceKey : encodeURIComponent(serviceKey)}&numOfRows=15`;
+    const encodedKey = hasPercent ? serviceKey : encodeURIComponent(serviceKey);
+    const baseUrl = 'https://apis.data.go.kr/1741000/volunteerPartcptnService';
+    const url = `${baseUrl}/getVltrSearchWordList?serviceKey=${encodedKey}&numOfRows=100&pageNo=1`;
 
     const response = await fetchWithTimeout(url, {}, 10000); // 10s timeout for portal API
     if (!response.ok) {
@@ -117,38 +165,44 @@ export async function GET() {
       return NextResponse.json(mockData);
     }
 
-    // 5. Map opportunities and geocode addresses in parallel
+    // 5. Map opportunities: prefer the government's own coordinates (from the
+    // per-item detail endpoint), falling back to Google geocoding of the address.
     const eventPromises = items.map(async (itemXml) => {
-      const id = extractTagValue(itemXml, 'progrmNo');
+      const id = extractTagValue(itemXml, 'progrmRegistNo');
       const title = extractTagValue(itemXml, 'progrmSj');
-      const organization = extractTagValue(itemXml, 'nanmmGroupNm');
+      const organization = extractTagValue(itemXml, 'nanmmbyNm');
       const address = extractTagValue(itemXml, 'actPlace');
+      const categoryCode = extractTagValue(itemXml, 'srvcClCode');
+      const category = CATEGORY_NAMES[categoryCode] || categoryCode || 'Volunteer';
 
       if (!id || !title) {
         return null;
       }
 
-      let lat = 37.5665; // Default fallback to Seoul coordinates
-      let lng = 126.978;
-      let hasCoordinates = false;
+      let coords: { lat: number; lng: number } | null = null;
 
-      // Geocode address if google key and valid address are available
-      if (address && googleKey) {
-        const coords = await geocodeAddress(address, googleKey);
-        if (coords) {
-          lat = coords.lat;
-          lng = coords.lng;
-          hasCoordinates = true;
+      // Fetch official coordinates from the detail endpoint for this program.
+      try {
+        const detailUrl = `${baseUrl}/getVltrPartcptnItem?serviceKey=${encodedKey}&progrmRegistNo=${encodeURIComponent(id)}`;
+        const detailResponse = await fetchWithTimeout(detailUrl, {}, 8000);
+        if (detailResponse.ok) {
+          const detailXml = await detailResponse.text();
+          coords =
+            parseAreaLalo(extractTagValue(detailXml, 'areaLalo1')) ||
+            parseAreaLalo(extractTagValue(detailXml, 'areaLalo2')) ||
+            parseAreaLalo(extractTagValue(detailXml, 'areaLalo3'));
         }
+      } catch (error) {
+        console.warn(`Failed to fetch detail/coordinates for program ${id}:`, error);
       }
 
-      // If geocoding was requested but failed to produce coordinates, we can either:
-      // - Fall back to the address string but keep default coords
-      // - Or skip this item entirely so we don't display markers at the exact same default point
-      // Let's keep the item but place it or skip it based on whether we could geocode it when googleKey is provided.
-      // Wait, if a key is provided, we should only display items on the map that successfully geocode.
-      // If we cannot geocode them, skipping them ensures they don't pile up on the default coordinates of Seoul City Hall!
-      if (googleKey && !hasCoordinates) {
+      // Fall back to geocoding the address if the government data had no usable coordinates.
+      if (!coords && address && googleKey) {
+        coords = await geocodeAddress(address, googleKey);
+      }
+
+      // Skip items we could not place on the map at all.
+      if (!coords) {
         return null;
       }
 
@@ -156,11 +210,11 @@ export async function GET() {
         id,
         title,
         organization: organization || undefined,
-        category: 'Volunteer',
+        category,
         status: 'Recruiting',
         location: {
-          lat,
-          lng,
+          lat: coords.lat,
+          lng: coords.lng,
           address: address || undefined,
         },
       };
@@ -174,6 +228,7 @@ export async function GET() {
       return NextResponse.json(mockData);
     }
 
+    eventsCache = { events, fetchedAt: Date.now() };
     return NextResponse.json({ events });
   } catch (error) {
     console.error('Error fetching/parsing 1365 volunteers data. Falling back to mock data. Error:', error);
