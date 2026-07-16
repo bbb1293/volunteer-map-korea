@@ -1,7 +1,11 @@
-# Volunteer Map Korea
-
 <div align="center">
-  <h3>Bridging Goodwill and Community Through Technology</h3>
+  <h1>🗺️ Volunteer Map Korea</h1>
+  <p><b>Bridging Goodwill and Community Through Technology</b></p>
+  <p><i>A Google Cloud Study Jam Hackathon Project (2026-07-16)</i></p>
+
+  <br />
+
+  <img src="./docs/assets/mockup.jpg" alt="Volunteer Map Korea UI Mockup" width="800" style="border-radius: 12px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15);" />
 </div>
 
 ## 🌟 The Vision: A More Beautiful, Connected Korea
@@ -23,6 +27,14 @@ By aggregating national public data and presenting it geographically, we provide
 - **Real-Time Data Integration:** Direct synchronization with the official 1365 portal (`data.go.kr`) for the most up-to-date recruitment status and locations.
 - **AI-Powered Matching:** A built-in Gemini AI assistant that chats with users to recommend personalized volunteering experiences (e.g., *"I want to do an environmental cleanup this weekend near Mapo-gu"*).
 - **Graceful Degradation:** A guaranteed flawless user experience with a local fallback dataset, ensuring users can always find a way to help even if upstream government APIs experience downtime.
+
+## 🏆 Hackathon WoW Factors!
+
+*   **🧠 Dual-AI Engine (Gemini 1.5 Flash):**
+    *   **Intelligent Agent Chat:** An interactive sidebar assistant matches vague user prompts (e.g., *"I want to help elderly people this Sunday"*) to active, geo-tagged volunteer listings.
+    *   **Dynamic Multilingual Translation (`/api/translate`):** Automatically translates complex, traditional Korean government listings into English (or other languages) on the fly, breaking down language barriers for foreign residents and tourists wishing to volunteer.
+*   **📊 Enterprise Observability out-of-the-box:** Fully instrumented with OpenTelemetry to track server latency, API route performance, and client-side Core Web Vitals directly to GCP Cloud Logging, Cloud Trace, and Cloud Monitoring.
+*   **🛡️ Production-Ready Environment Isolation:** Zero hardcoded API keys. Implements local `.env.local` testing that seamlessly migrates to GCP Secret Manager injection on Cloud Run in production.
 
 ## 🏗️ Architecture
 
