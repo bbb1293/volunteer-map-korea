@@ -154,12 +154,9 @@ body {
 }
 
 @keyframes glow {
-  from {
-    box-shadow: 0 0 4px rgba(234, 179, 8, 0.3);
-  }
-  to {
-    box-shadow: 0 0 12px rgba(234, 179, 8, 0.7);
-  }
+  0% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+  100% { transform: scale(1); }
 }
 
 .btn-translate {
@@ -265,6 +262,24 @@ body {
   100% {
     transform: scale(2.4);
     opacity: 0;
+  }
+}
+
+@media (max-width: 640px) {
+  .badge-overlay {
+    top: 10px;
+    right: 10px;
+    left: 10px;
+    width: auto;
+    max-width: none;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  }
+  .glass-card {
+    left: 10px;
+    bottom: 10px;
+    width: calc(100% - 20px);
+    max-width: none;
+    margin-right: 10px;
   }
 }
 

@@ -23,6 +23,7 @@ export default function MapComponent() {
   const [selectedEvent, setSelectedEvent] = useState<VolunteerEvent | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [clickedCount, setClickedCount] = useState(0);
+  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
 
   useEffect(() => {
     let active = true;
@@ -78,6 +79,8 @@ export default function MapComponent() {
                     content: pinContainer,
                   });
 
+                  markersRef.current.push(marker);
+
                   marker.addListener('click', () => {
                     setSelectedEvent(event);
                     setClickedCount((prev) => prev + 1);
@@ -109,6 +112,10 @@ export default function MapComponent() {
       active = false;
       if (timerId) clearTimeout(timerId);
       mapInitialized.current = false; // Reset to support Strict Mode remounts
+      markersRef.current.forEach((m) => {
+        m.map = null;
+      });
+      markersRef.current = [];
     };
   }, []);
 
