@@ -19,6 +19,29 @@ export default function MapComponent() {
         });
         setMap(newMap);
         mapInitialized.current = true;
+
+        // Fetch and plot inside initMap after creating newMap:
+        fetch('/api/volunteers')
+          .then(res => res.json())
+          .then(data => {
+            if (data && Array.isArray(data.events)) {
+              data.events.forEach((event: any) => {
+                const marker = new google.maps.marker.AdvancedMarkerElement({
+                  map: newMap,
+                  position: { lat: event.location.lat, lng: event.location.lng },
+                  title: event.translatedTitle || event.title, // Fallback to Korean title
+                });
+
+                marker.addListener('click', () => {
+                  alert(`Clicked event: ${event.id}`);
+                });
+              });
+            }
+          })
+          .catch(err => {
+            console.error('Error fetching volunteer events:', err);
+          });
+
         return true;
       }
       return mapInitialized.current;
