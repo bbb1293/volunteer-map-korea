@@ -37,11 +37,11 @@ graph TD
     end
     
     subgraph Backend [Google Cloud Run - Next.js Server]
-        API_Volunteers[/api/volunteers]
-        API_Chat[/api/chat]
-        API_Metrics[/api/metrics]
+        API_Volunteers["/api/volunteers"]
+        API_Chat["/api/chat"]
+        API_Metrics["/api/metrics"]
         
-        Cache[(Local JSON Fallback)]
+        Cache[("Local JSON Fallback")]
     end
     
     subgraph External_Services [External APIs]
