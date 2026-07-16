@@ -26,52 +26,7 @@ By aggregating national public data and presenting it geographically, we provide
 
 ## 🏗️ Architecture
 
-```mermaid
-graph TD
-    User([User Browser])
-    
-    subgraph Frontend [Next.js Client]
-        Map[Google Maps Component]
-        ChatUI[Gemini Chat UI]
-        Metrics[Web Vitals & Events]
-    end
-    
-    subgraph Backend [Google Cloud Run - Next.js Server]
-        API_Volunteers["/api/volunteers"]
-        API_Chat["/api/chat"]
-        API_Metrics["/api/metrics"]
-        
-        Cache[("Local JSON Fallback")]
-    end
-    
-    subgraph External_Services [External APIs]
-        GovAPI[1365 Portal API data.go.kr]
-        Gemini[Gemini 1.5 Flash AI Studio]
-        GoogleMapsAPI[Google Maps Platform]
-    end
-    
-    subgraph GCP_Observability [GCP Observability]
-        Logging[Cloud Logging]
-        Monitoring[Cloud Monitoring]
-        Trace[Cloud Trace]
-    end
-    
-    User -->|Views & Interacts| Frontend
-    Frontend -- Map Data --> GoogleMapsAPI
-    
-    Frontend -- GET /api/volunteers --> API_Volunteers
-    Frontend -- POST /api/chat --> API_Chat
-    Frontend -- POST /api/metrics --> API_Metrics
-    
-    API_Volunteers -- Fetches XML Data --> GovAPI
-    API_Volunteers -. API Timeout/Failure .-> Cache
-    
-    API_Chat -- Prompts & Context --> Gemini
-    
-    API_Metrics --> Logging
-    API_Volunteers --> Trace
-    API_Chat --> Trace
-```
+![Volunteer Map Korea Architecture](./docs/assets/architecture_diagram.png)
 
 ## 🚀 Technology Stack
 *   **Framework:** Next.js 14 (App Router)
