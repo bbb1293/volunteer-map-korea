@@ -27,67 +27,84 @@ By aggregating national public data and presenting it geographically, we provide
 ## 🏗️ Architecture
 
 ```mermaid
-graph LR
-    %% Define User
-    User(("👤 User Browser"))
+flowchart LR
+    %% Styling Definitions
+    classDef default fill:#ffffff,stroke:#d1d5db,stroke-width:1px,color:#374151,rx:6px,ry:6px;
+    classDef user fill:#eff6ff,stroke:#3b82f6,stroke-width:2px,color:#1e3a8a;
+    classDef frontend fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,color:#14532d;
+    classDef gcpNode fill:#f0f9ff,stroke:#0ea5e9,stroke-width:2px,color:#0c4a6e;
+    classDef opsNode fill:#fdf4ff,stroke:#d946ef,stroke-width:2px,color:#701a75;
+    classDef extNode fill:#fffbeb,stroke:#f59e0b,stroke-width:2px,color:#78350f;
+    classDef dbNode fill:#f3f4f6,stroke:#6b7280,stroke-width:2px,color:#1f2937;
+    
+    %% Subgraph Styling
+    style Frontend fill:#f0fdf4,stroke:#22c55e,stroke-width:2px,stroke-dasharray: 5 5,rx:10
+    style GCP fill:#f0f9ff,stroke:#0ea5e9,stroke-width:2px,stroke-dasharray: 5 5,rx:10
+    style CloudRun fill:#ffffff,stroke:#0ea5e9,stroke-width:1px,rx:5
+    style Ops fill:#ffffff,stroke:#d946ef,stroke-width:1px,rx:5
+    style External fill:#fffbeb,stroke:#f59e0b,stroke-width:2px,stroke-dasharray: 5 5,rx:10
+
+    %% User Node
+    User(("👤 User Browser")):::user
     
     %% Frontend Subgraph
     subgraph Frontend ["🖥️ Next.js Client"]
         direction TB
-        Map["🗺️ Google Maps Component"]
-        ChatUI["💬 Gemini Chat UI"]
+        Map("🗺️ Google Maps UI"):::frontend
+        ChatUI("💬 Gemini Chat UI"):::frontend
     end
     
     %% GCP Infrastructure Subgraph
     subgraph GCP ["☁️ Google Cloud Platform"]
         direction TB
+        
         subgraph CloudRun ["🏃 Cloud Run (Next.js Server)"]
             direction TB
-            API_Vol["/api/volunteers"]
-            API_Chat["/api/chat"]
-            API_Met["/api/metrics"]
-            Cache[("💾 Local JSON Fallback")]
+            API_Vol("🌐 /api/volunteers"):::gcpNode
+            API_Chat("💬 /api/chat"):::gcpNode
+            API_Met("📊 /api/metrics"):::gcpNode
+            Cache[("💾 Local JSON")]:::dbNode
         end
         
-        subgraph Ops ["📊 Observability"]
+        subgraph Ops ["📈 Observability"]
             direction TB
-            Log["Cloud Logging"]
-            Mon["Cloud Monitoring"]
-            Trace["Cloud Trace"]
+            Log("📝 Cloud Logging"):::opsNode
+            Mon("📉 Cloud Monitoring"):::opsNode
+            Trace("🔍 Cloud Trace"):::opsNode
         end
         
-        Sec[("🔑 Secret Manager")]
-        Art[("📦 Artifact Registry")]
+        Sec[("🔑 Secret Manager")]:::dbNode
+        Art[("📦 Artifact Registry")]:::dbNode
     end
     
     %% External APIs Subgraph
     subgraph External ["🌐 External APIs"]
         direction TB
-        Gov["🏛️ 1365 Portal (data.go.kr)"]
-        Gem["✨ Gemini 1.5 Flash"]
-        GMap["📍 Google Maps Platform"]
+        Gov("🏛️ 1365 Portal"):::extNode
+        Gem("✨ Gemini 1.5 Flash"):::extNode
+        GMap("📍 Google Maps API"):::extNode
     end
     
-    %% Flow & Connections
-    User -->|"Interacts"| Frontend
+    %% Flows & Connections
+    User ===|"Interacts"| Frontend
     
     Map -->|"Renders map"| GMap
-    Map -->|"GET /api/volunteers"| API_Vol
-    ChatUI -->|"POST /api/chat"| API_Chat
-    Frontend -->|"POST /api/metrics"| API_Met
+    Map -->|"GET data"| API_Vol
+    ChatUI -->|"POST prompt"| API_Chat
+    Frontend -->|"POST metrics"| API_Met
     
-    API_Vol -->|"Fetches XML"| Gov
+    API_Vol ==>|"Fetches XML"| Gov
     API_Vol -.->|"Fallback"| Cache
     
-    API_Chat -->|"Prompts"| Gem
+    API_Chat ==>|"Prompts"| Gem
     
-    Sec -.->|"Injects API Keys"| CloudRun
+    Sec -.->|"Injects Keys"| CloudRun
     Art -.->|"Deploys Container"| CloudRun
     
-    API_Met -->|"Sends Logs"| Log
+    API_Met -->|"Logs"| Log
     API_Vol -->|"Traces"| Trace
     API_Chat -->|"Traces"| Trace
-    CloudRun -->|"Health/Metrics"| Mon
+    CloudRun -->|"Metrics"| Mon
 ```
 
 ## 🚀 Technology Stack
