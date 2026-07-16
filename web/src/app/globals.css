@@ -28,8 +28,20 @@ body {
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
   z-index: 1000;
   color: #1e293b;
-  transition: all 0.3s ease;
   box-sizing: border-box;
+  animation: slideIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  transition: all 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    transform: translateY(30px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
 }
 
 /* Badge Overlay */
@@ -47,7 +59,7 @@ body {
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
   z-index: 1000;
   color: #1e293b;
-  transition: all 0.3s ease;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
 }
 
@@ -60,6 +72,12 @@ body {
   padding-bottom: 8px;
 }
 
+.badge-overlay:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 40px 0 rgba(31, 38, 135, 0.22), 0 0 15px rgba(37, 99, 235, 0.15);
+  border-color: rgba(37, 99, 235, 0.4);
+}
+
 .badge-item {
   display: flex;
   align-items: center;
@@ -68,8 +86,13 @@ body {
   padding: 8px;
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.5);
-  transition: background 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.badge-item:hover {
+  transform: translateX(4px);
+  background: rgba(255, 255, 255, 0.75);
 }
 
 .badge-item.locked {
@@ -79,6 +102,14 @@ body {
 .badge-item.unlocked {
   background: rgba(254, 240, 138, 0.3);
   border-color: rgba(234, 179, 8, 0.3);
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.1);
+}
+
+.badge-item.unlocked:hover {
+  transform: translateX(4px) scale(1.02);
+  background: rgba(254, 240, 138, 0.45);
+  border-color: rgba(234, 179, 8, 0.6);
+  box-shadow: 0 0 15px rgba(234, 179, 8, 0.3);
 }
 
 .badge-icon {
@@ -91,6 +122,11 @@ body {
   border-radius: 50%;
   background: rgba(241, 245, 249, 0.8);
   flex-shrink: 0;
+  transition: transform 0.3s ease;
+}
+
+.badge-item:hover .badge-icon {
+  transform: rotate(15deg) scale(1.1);
 }
 
 .badge-item.unlocked .badge-icon {
@@ -136,11 +172,15 @@ body {
   cursor: pointer;
   width: 100%;
   margin-top: 12px;
-  transition: background 0.2s ease;
+  transition: background 0.2s ease, transform 0.1s ease;
 }
 
 .btn-translate:hover {
   background: #1d4ed8;
+}
+
+.btn-translate:active {
+  transform: scale(0.98);
 }
 
 .btn-translate:disabled {
@@ -163,11 +203,68 @@ body {
   align-items: center;
   justify-content: center;
   border-radius: 50%;
-  transition: background 0.2s ease, color 0.2s ease;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
 }
 
 .btn-close:hover {
   background: rgba(15, 23, 42, 0.05);
   color: #1e293b;
+  transform: rotate(90deg);
+}
+
+/* Custom Map Pin Styles */
+.custom-map-pin {
+  position: relative;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+}
+
+.custom-map-pin:hover {
+  transform: scale(1.35);
+  z-index: 9999;
+}
+
+.pin-pulse {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  opacity: 0.6;
+  animation: pulse-ripple 2s cubic-bezier(0.165, 0.84, 0.44, 1) infinite;
+  pointer-events: none;
+}
+
+.pin-core {
+  position: relative;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 0 12px var(--pin-color, #3b82f6), 0 2px 4px rgba(0, 0, 0, 0.15);
+  border: 2px solid #ffffff;
+  transition: box-shadow 0.3s ease, transform 0.3s ease;
+}
+
+.custom-map-pin:hover .pin-core {
+  box-shadow: 0 0 18px var(--pin-color, #3b82f6), 0 4px 10px rgba(0, 0, 0, 0.25);
+  transform: translateY(-2px);
+}
+
+@keyframes pulse-ripple {
+  0% {
+    transform: scale(0.65);
+    opacity: 0.85;
+  }
+  100% {
+    transform: scale(2.4);
+    opacity: 0;
+  }
 }
 

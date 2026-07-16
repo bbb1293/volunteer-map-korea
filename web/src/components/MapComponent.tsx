@@ -54,10 +54,28 @@ export default function MapComponent() {
                   typeof event.location.lat === 'number' && !isNaN(event.location.lat) &&
                   typeof event.location.lng === 'number' && !isNaN(event.location.lng)
                 ) {
+                  const pinContainer = document.createElement('div');
+                  pinContainer.className = 'custom-map-pin';
+                  const isEnv = event.category === 'Environment';
+                  const pinColor = isEnv ? '#10b981' : '#8b5cf6';
+                  pinContainer.style.setProperty('--pin-color', pinColor);
+
+                  const svgIcon = isEnv
+                    ? `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;"><path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 3.5 1 8a8.5 8.5 0 0 1-9 10Z"></path><path d="M19 2c-2.26 4.33-5.27 7.14-8 10"></path></svg>`
+                    : `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>`;
+
+                  pinContainer.innerHTML = `
+                    <div class="pin-pulse" style="background-color: ${pinColor}"></div>
+                    <div class="pin-core" style="background-color: ${pinColor}">
+                      ${svgIcon}
+                    </div>
+                  `;
+
                   const marker = new google.maps.marker.AdvancedMarkerElement({
                     map: newMap,
                     position: { lat: event.location.lat, lng: event.location.lng },
                     title: event.translatedTitle || event.title,
+                    content: pinContainer,
                   });
 
                   marker.addListener('click', () => {
