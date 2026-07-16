@@ -50,12 +50,12 @@ resource "google_cloud_run_v2_service" "default" {
   template {
     containers {
       image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.repo.name}/volunteer-map-web:latest"
-      
+
       env {
         name  = "NEXT_PUBLIC_MAP_ID"
         value = var.map_id
       }
-      
+
       env {
         name  = "GOOGLE_MAPS_API_KEY"
         value = var.google_maps_api_key
