@@ -67,6 +67,7 @@
     "moduleResolution": "nodenext",
     "strict": true,
     "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true,
     "noEmit": true,
     "esModuleInterop": true,
     "skipLibCheck": true
@@ -74,6 +75,8 @@
   "include": ["src/**/*.ts"]
 }
 ```
+
+`allowImportingTsExtensions` is required alongside `noEmit` because every relative import in this project uses an explicit `.ts` extension (Node's ESM loader requires it to run `.ts` files directly) — without this flag, `tsc --noEmit` rejects those extensions even though Node itself accepts them.
 
 - [ ] **Step 3: Create `sync-job/.gitignore`**
 
