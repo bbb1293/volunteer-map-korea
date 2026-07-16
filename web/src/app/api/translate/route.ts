@@ -4,7 +4,7 @@ import mockData from '@/data/seoul_volunteers.json';
 export async function POST(request: Request) {
   try {
     const { eventId, lang } = await request.json();
-    const event = mockData.events.find((e: any) => e.id === eventId);
+    const event = mockData.events.find((e: { id: string; translatedTitle?: string; title: string; organization?: string }) => e.id === eventId);
     if (!event) {
       return NextResponse.json({ error: 'Event not found' }, { status: 404 });
     }
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 Title: ${event.title}
 Organization: ${event.organization}`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
@@ -48,13 +48,13 @@ Organization: ${event.organization}`;
       title: result.title,
       organization: result.organization,
     });
-  } catch (error: any) {
+  } catch (error) {
     console.error('Translation error:', error);
     return NextResponse.json({ error: 'Failed to translate' }, { status: 500 });
   }
 }
 
-function extractJSON(text: string): any {
+function extractJSON(text: string): { title: string; organization?: string } {
   const firstBrace = text.indexOf('{');
   if (firstBrace === -1) {
     throw new Error('No JSON object found in response');
