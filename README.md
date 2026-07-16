@@ -27,58 +27,67 @@ By aggregating national public data and presenting it geographically, we provide
 ## 🏗️ Architecture
 
 ```mermaid
-graph TD
-    User([User Browser])
+graph LR
+    %% Define User
+    User(("👤 User Browser"))
     
-    subgraph Frontend [Next.js Client]
-        Map[Google Maps Component]
-        ChatUI[Gemini Chat UI]
+    %% Frontend Subgraph
+    subgraph Frontend ["🖥️ Next.js Client"]
+        direction TB
+        Map["🗺️ Google Maps Component"]
+        ChatUI["💬 Gemini Chat UI"]
     end
     
-    subgraph GCP_Infra [Google Cloud Platform Infrastructure]
-        subgraph Compute [Serverless Compute]
-            subgraph CloudRun [Cloud Run container]
-                API_Volunteers["/api/volunteers"]
-                API_Chat["/api/chat"]
-                API_Metrics["/api/metrics"]
-                Cache[("Local JSON Fallback")]
-            end
+    %% GCP Infrastructure Subgraph
+    subgraph GCP ["☁️ Google Cloud Platform"]
+        direction TB
+        subgraph CloudRun ["🏃 Cloud Run (Next.js Server)"]
+            direction TB
+            API_Vol["/api/volunteers"]
+            API_Chat["/api/chat"]
+            API_Met["/api/metrics"]
+            Cache[("💾 Local JSON Fallback")]
         end
         
-        SecretManager[("Secret Manager<br/>(API Keys)")]
-        ArtifactRegistry[("Artifact Registry<br/>(Docker Images)")]
-        
-        subgraph Observability [Operations Suite]
-            Logging["Cloud Logging"]
-            Monitoring["Cloud Monitoring"]
+        subgraph Ops ["📊 Observability"]
+            direction TB
+            Log["Cloud Logging"]
+            Mon["Cloud Monitoring"]
             Trace["Cloud Trace"]
         end
+        
+        Sec[("🔑 Secret Manager")]
+        Art[("📦 Artifact Registry")]
     end
     
-    subgraph External_Services [External APIs]
-        GovAPI["1365 Portal API<br/>(data.go.kr)"]
-        Gemini["Gemini 1.5 Flash<br/>(AI Studio)"]
-        GoogleMapsAPI["Google Maps Platform"]
+    %% External APIs Subgraph
+    subgraph External ["🌐 External APIs"]
+        direction TB
+        Gov["🏛️ 1365 Portal (data.go.kr)"]
+        Gem["✨ Gemini 1.5 Flash"]
+        GMap["📍 Google Maps Platform"]
     end
     
-    User -->|Views & Interacts| Frontend
-    Frontend -- Map Data --> GoogleMapsAPI
+    %% Flow & Connections
+    User -->|"Interacts"| Frontend
     
-    Frontend -- GET /api/volunteers --> API_Volunteers
-    Frontend -- POST /api/chat --> API_Chat
-    Frontend -- POST /api/metrics --> API_Metrics
+    Map -->|"Renders map"| GMap
+    Map -->|"GET /api/volunteers"| API_Vol
+    ChatUI -->|"POST /api/chat"| API_Chat
+    Frontend -->|"POST /api/metrics"| API_Met
     
-    SecretManager -. Injects Secrets .-> CloudRun
-    ArtifactRegistry -. Deploys Container to .-> CloudRun
+    API_Vol -->|"Fetches XML"| Gov
+    API_Vol -.->|"Fallback"| Cache
     
-    API_Volunteers -- Fetches XML Data --> GovAPI
-    API_Volunteers -. API Timeout/Failure .-> Cache
-    API_Chat -- Prompts & Context --> Gemini
+    API_Chat -->|"Prompts"| Gem
     
-    CloudRun --> Logging
-    CloudRun --> Monitoring
-    API_Volunteers --> Trace
-    API_Chat --> Trace
+    Sec -.->|"Injects API Keys"| CloudRun
+    Art -.->|"Deploys Container"| CloudRun
+    
+    API_Met -->|"Sends Logs"| Log
+    API_Vol -->|"Traces"| Trace
+    API_Chat -->|"Traces"| Trace
+    CloudRun -->|"Health/Metrics"| Mon
 ```
 
 ## 🚀 Technology Stack
