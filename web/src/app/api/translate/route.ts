@@ -3,11 +3,12 @@ import mockData from '@/data/seoul_volunteers.json';
 
 export async function POST(request: Request) {
   try {
-    const { eventId, lang, title, organization, address } = await request.json();
+    const { eventId, lang, title, organization, address, description } = await request.json();
 
     let eventTitle = title;
     let eventOrg = organization;
     let eventAddress = address;
+    let eventDescription = description;
     let fallbackTranslatedTitle: string | undefined = undefined;
 
     if (!eventTitle) {
@@ -27,13 +28,15 @@ export async function POST(request: Request) {
         title: fallbackTranslatedTitle || eventTitle,
         organization: eventOrg,
         address: eventAddress,
+        description: eventDescription,
       });
     }
 
-    const prompt = `Translate the following volunteer event info into ${lang || 'English'}. Return ONLY a JSON object with keys "title", "organization", and "address", nothing else. Do not wrap the response in markdown blocks. Keep proper nouns/place names transliterated naturally rather than literally word-for-word.
+    const prompt = `Translate the following volunteer event info into ${lang || 'English'}. Return ONLY a JSON object with keys "title", "organization", "address", and "description", nothing else. Do not wrap the response in markdown blocks. Keep proper nouns/place names transliterated naturally rather than literally word-for-word. Preserve paragraph breaks in the description.
 Title: ${eventTitle}
 Organization: ${eventOrg}
-Address: ${eventAddress || ''}`;
+Address: ${eventAddress || ''}
+Description: ${eventDescription || ''}`;
 
     const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
 
@@ -71,6 +74,7 @@ Address: ${eventAddress || ''}`;
           title: result.title,
           organization: result.organization,
           address: result.address,
+          description: result.description,
         });
       } catch (err) {
         lastError = err;
@@ -85,7 +89,7 @@ Address: ${eventAddress || ''}`;
   }
 }
 
-function extractJSON(text: string): { title: string; organization?: string; address?: string } {
+function extractJSON(text: string): { title: string; organization?: string; address?: string; description?: string } {
   const firstBrace = text.indexOf('{');
   if (firstBrace === -1) {
     throw new Error('No JSON object found in response');

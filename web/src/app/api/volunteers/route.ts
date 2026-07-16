@@ -73,6 +73,9 @@ function decodeXmlEntities(str: string): string {
     .replace(/&quot;/g, '"')
     .replace(/&apos;/g, "'")
     .replace(/&#39;/g, "'")
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, hex) => String.fromCharCode(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCharCode(parseInt(dec, 10)))
+    .replace(/\r\n|\r/g, '\n')
     .trim();
 }
 
@@ -199,8 +202,11 @@ export async function GET() {
       }
 
       let coords: { lat: number; lng: number } | null = null;
+      let description: string | undefined;
+      let spotsNeeded: number | undefined;
+      let spotsFilled: number | undefined;
 
-      // Fetch official coordinates from the detail endpoint for this program.
+      // Fetch official coordinates plus description/headcount from the detail endpoint.
       try {
         const detailUrl = `${baseUrl}/getVltrPartcptnItem?serviceKey=${encodedKey}&progrmRegistNo=${encodeURIComponent(id)}`;
         const detailResponse = await fetchWithTimeout(detailUrl, {}, 8000);
@@ -210,6 +216,12 @@ export async function GET() {
             parseAreaLalo(extractTagValue(detailXml, 'areaLalo1')) ||
             parseAreaLalo(extractTagValue(detailXml, 'areaLalo2')) ||
             parseAreaLalo(extractTagValue(detailXml, 'areaLalo3'));
+
+          description = extractTagValue(detailXml, 'progrmCn') || undefined;
+          const rcritNmpr = parseInt(extractTagValue(detailXml, 'rcritNmpr'), 10);
+          const appTotal = parseInt(extractTagValue(detailXml, 'appTotal'), 10);
+          spotsNeeded = isNaN(rcritNmpr) ? undefined : rcritNmpr;
+          spotsFilled = isNaN(appTotal) ? undefined : appTotal;
         }
       } catch (error) {
         console.warn(`Failed to fetch detail/coordinates for program ${id}:`, error);
@@ -236,6 +248,9 @@ export async function GET() {
         startTime,
         endTime,
         externalUrl,
+        description,
+        spotsNeeded,
+        spotsFilled,
         location: {
           lat: coords.lat,
           lng: coords.lng,

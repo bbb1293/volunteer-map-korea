@@ -13,6 +13,9 @@ interface VolunteerEvent {
   startTime?: string;
   endTime?: string;
   externalUrl?: string;
+  description?: string;
+  spotsNeeded?: number;
+  spotsFilled?: number;
   location?: {
     lat: number;
     lng: number;
@@ -42,6 +45,18 @@ const CATEGORY_GROUPS: Record<string, CategoryGroup> = {
 
 function getCategoryGroup(category?: string): CategoryGroup {
   return (category && CATEGORY_GROUPS[category]) || 'other';
+}
+
+// Only treat an event as "full" when we have real headcount data for it —
+// most listings currently lack spotsNeeded/spotsFilled (detail fetch can
+// time out under load), and those should stay visible rather than be
+// silently hidden by a filter that can't actually evaluate them.
+function isFull(event: VolunteerEvent): boolean {
+  return (
+    typeof event.spotsNeeded === 'number' &&
+    typeof event.spotsFilled === 'number' &&
+    event.spotsFilled >= event.spotsNeeded
+  );
 }
 
 // Validated categorical palette (dataviz skill): the first 4 slots (blue,
@@ -95,6 +110,9 @@ const UI_TEXT = {
     when: 'When:',
     dailyTime: 'Daily time:',
     viewOriginal: 'View Original Listing ↗',
+    description: 'Description:',
+    spotsFilled: 'Spots filled:',
+    hideFullFilter: 'Hide full opportunities',
   },
   ko: {
     badgesTitle: '봉사활동 임팩트 배지',
@@ -112,6 +130,9 @@ const UI_TEXT = {
     when: '기간:',
     dailyTime: '활동 시간:',
     viewOriginal: '1365 포털에서 원본 보기 ↗',
+    description: '설명:',
+    spotsFilled: '모집 현황:',
+    hideFullFilter: '마감된 활동 숨기기',
   },
 };
 
@@ -122,13 +143,15 @@ export default function MapComponent() {
 
   const [selectedEvent, setSelectedEvent] = useState<VolunteerEvent | null>(null);
   const [language, setLanguage] = useState<'ko' | 'en'>('ko');
-  const [translationCache, setTranslationCache] = useState<Record<string, { title: string; organization?: string; address?: string }>>({});
+  const [translationCache, setTranslationCache] = useState<Record<string, { title: string; organization?: string; address?: string; description?: string }>>({});
   const [translatingId, setTranslatingId] = useState<string | null>(null);
   const [clickedCount, setClickedCount] = useState(0);
   const [isLocating, setIsLocating] = useState(false);
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
-  const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
+  const [hideFullEvents, setHideFullEvents] = useState(false);
+  const hideFullRef = useRef(false);
+  const markersRef = useRef<{ marker: google.maps.marker.AdvancedMarkerElement; event: VolunteerEvent }[]>([]);
   const userMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
   const hasCenteredOnUser = useRef(false);
 
@@ -187,13 +210,13 @@ export default function MapComponent() {
                   `;
 
                   const marker = new google.maps.marker.AdvancedMarkerElement({
-                    map: newMap,
+                    map: (hideFullRef.current && isFull(event)) ? null : newMap,
                     position: { lat: event.location.lat, lng: event.location.lng },
                     title: event.translatedTitle || event.title,
                     content: pinContainer,
                   });
 
-                  markersRef.current.push(marker);
+                  markersRef.current.push({ marker, event });
 
                   marker.addListener('click', () => {
                     setSelectedEvent(event);
@@ -242,8 +265,8 @@ export default function MapComponent() {
       console.error = origError; // Restore original console.error
       if (timerId) clearTimeout(timerId);
       mapInitialized.current = false; // Reset to support Strict Mode remounts
-      markersRef.current.forEach((m) => {
-        m.map = null;
+      markersRef.current.forEach(({ marker }) => {
+        marker.map = null;
       });
       markersRef.current = [];
     };
@@ -299,6 +322,15 @@ export default function MapComponent() {
     };
   }, [map]);
 
+  // Show/hide markers for events we know are full, without recreating them.
+  useEffect(() => {
+    hideFullRef.current = hideFullEvents;
+    if (!map) return;
+    markersRef.current.forEach(({ marker, event }) => {
+      marker.map = hideFullEvents && isFull(event) ? null : map;
+    });
+  }, [hideFullEvents, map]);
+
   // Load the saved language preference once on mount.
   useEffect(() => {
     const saved = window.localStorage.getItem('vmk-language');
@@ -334,6 +366,7 @@ export default function MapComponent() {
         title: selectedEvent.title,
         organization: selectedEvent.organization,
         address: selectedEvent.location?.address,
+        description: selectedEvent.description,
         lang: 'English',
       }),
     })
@@ -342,7 +375,12 @@ export default function MapComponent() {
         if (cancelled) return;
         setTranslationCache((prev) => ({
           ...prev,
-          [selectedEvent.id]: { title: data.title, organization: data.organization, address: data.address },
+          [selectedEvent.id]: {
+            title: data.title,
+            organization: data.organization,
+            address: data.address,
+            description: data.description,
+          },
         }));
       })
       .catch((err) => console.error('Auto-translate failed:', err))
@@ -360,18 +398,25 @@ export default function MapComponent() {
   // Resolves what to actually display for the current language setting.
   const getDisplayText = (event: VolunteerEvent) => {
     const address = event.location?.address;
+    const description = event.description;
     if (language === 'ko') {
-      return { title: event.title, organization: event.organization, address, isTranslating: false };
+      return { title: event.title, organization: event.organization, address, description, isTranslating: false };
     }
     if (event.translatedTitle) {
       // Mock data's address is already static English; no translation needed.
-      return { title: event.translatedTitle, organization: event.organization, address, isTranslating: false };
+      return { title: event.translatedTitle, organization: event.organization, address, description, isTranslating: false };
     }
     const cached = translationCache[event.id];
     if (cached) {
-      return { title: cached.title, organization: cached.organization, address: cached.address || address, isTranslating: false };
+      return {
+        title: cached.title,
+        organization: cached.organization,
+        address: cached.address || address,
+        description: cached.description || description,
+        isTranslating: false,
+      };
     }
-    return { title: event.title, organization: event.organization, address, isTranslating: translatingId === event.id };
+    return { title: event.title, organization: event.organization, address, description, isTranslating: translatingId === event.id };
   };
 
   const handleLocate = () => {
@@ -497,6 +542,14 @@ export default function MapComponent() {
             <span className="legend-label">{GROUP_STYLES[group].label[language]}</span>
           </div>
         ))}
+        <label className="legend-filter-row">
+          <input
+            type="checkbox"
+            checked={hideFullEvents}
+            onChange={(e) => setHideFullEvents(e.target.checked)}
+          />
+          <span className="legend-label">{UI_TEXT[language].hideFullFilter}</span>
+        </label>
       </div>
 
       {/* Gamification Badges Overlay */}
@@ -559,6 +612,17 @@ export default function MapComponent() {
             {(selectedEvent.startTime || selectedEvent.endTime) && (
               <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
                 <strong>{UI_TEXT[language].dailyTime}</strong> {selectedEvent.startTime || '?'} - {selectedEvent.endTime || '?'}
+              </div>
+            )}
+            {typeof selectedEvent.spotsNeeded === 'number' && (
+              <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
+                <strong>{UI_TEXT[language].spotsFilled}</strong> {selectedEvent.spotsFilled ?? 0} / {selectedEvent.spotsNeeded}
+              </div>
+            )}
+            {display.description && (
+              <div style={{ fontSize: '14px', margin: '8px 0 4px 0', color: '#475569' }}>
+                <strong>{UI_TEXT[language].description}</strong>
+                <p className="card-description">{display.description}</p>
               </div>
             )}
             <div className="card-actions">

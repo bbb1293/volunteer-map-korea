@@ -19,6 +19,8 @@ body {
   left: 24px;
   width: calc(100% - 48px);
   max-width: 400px;
+  max-height: calc(100vh - 48px);
+  overflow-y: auto;
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -31,6 +33,15 @@ body {
   box-sizing: border-box;
   animation: slideIn 0.45s cubic-bezier(0.16, 1, 0.3, 1) forwards;
   transition: all 0.3s ease;
+}
+
+.card-description {
+  margin: 4px 0 0 0;
+  font-weight: 400;
+  white-space: pre-line;
+  max-height: 160px;
+  overflow-y: auto;
+  padding-right: 4px;
 }
 
 @keyframes slideIn {
@@ -385,6 +396,23 @@ body {
   font-weight: 500;
   color: #334155;
   white-space: nowrap;
+}
+
+.legend-filter-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 0 3px 0;
+  margin-top: 5px;
+  border-top: 1px solid rgba(15, 23, 42, 0.08);
+  cursor: pointer;
+}
+
+.legend-filter-row input[type="checkbox"] {
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+  accent-color: #2563eb;
 }
 
 @media (max-width: 640px) {
