@@ -6,6 +6,12 @@
   <br />
 
   <img src="./docs/assets/mockup.jpg" alt="Volunteer Map Korea UI Mockup" width="800" style="border-radius: 12px; box-shadow: 0 4px 30px rgba(0, 0, 0, 0.15);" />
+
+  <p>
+    <a href="https://volunteer-map-service-ta2zjihc7a-du.a.run.app"><b>🚀 Live Demo</b></a>
+    &nbsp;&mdash;&nbsp;
+    <code>https://volunteer-map-service-ta2zjihc7a-du.a.run.app</code>
+  </p>
 </div>
 
 ## 🌟 The Vision: A More Beautiful, Connected Korea
