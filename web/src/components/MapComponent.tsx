@@ -23,6 +23,7 @@ export default function MapComponent() {
   const [selectedEvent, setSelectedEvent] = useState<VolunteerEvent | null>(null);
   const [isTranslating, setIsTranslating] = useState(false);
   const [clickedCount, setClickedCount] = useState(0);
+  const [isLocating, setIsLocating] = useState(false);
   const markersRef = useRef<google.maps.marker.AdvancedMarkerElement[]>([]);
 
   useEffect(() => {
@@ -52,6 +53,27 @@ export default function MapComponent() {
         });
         setMap(newMap);
         mapInitialized.current = true;
+
+        // Automatically request user coordinates on initialization and center/zoom on them
+        if (navigator.geolocation) {
+          navigator.geolocation.getCurrentPosition(
+            (position) => {
+              if (!active) return;
+              const pos = {
+                lat: position.coords.latitude,
+                lng: position.coords.longitude,
+              };
+              newMap.setCenter(pos);
+              newMap.setZoom(14);
+            },
+            (error) => {
+              if (!active) return;
+              console.log('Geolocation on initialization denied/failed:', error.message);
+              // Fallback is already Seoul, which the map is initialized with.
+            },
+            { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+          );
+        }
 
         fetch('/api/volunteers')
           .then((res) => res.json())
@@ -164,9 +186,65 @@ export default function MapComponent() {
     }
   };
 
+  const handleLocate = () => {
+    if (!map) return;
+    setIsLocating(true);
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        (position) => {
+          const pos = {
+            lat: position.coords.latitude,
+            lng: position.coords.longitude,
+          };
+          map.panTo(pos);
+          map.setZoom(14);
+          setIsLocating(false);
+        },
+        (error) => {
+          console.error('Error getting location:', error);
+          alert('Could not retrieve your location. Please check your browser permissions.');
+          setIsLocating(false);
+        },
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+      );
+    } else {
+      alert('Geolocation is not supported by your browser.');
+      setIsLocating(false);
+    }
+  };
+
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
       <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* GPS Target Button Overlay */}
+      <button
+        className="gps-button"
+        onClick={handleLocate}
+        disabled={isLocating}
+        title="Recenter Map to My Location"
+        aria-label="Recenter Map to My Location"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          width="20"
+          height="20"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          className={isLocating ? 'spinning' : ''}
+        >
+          <line x1="2" x2="5" y1="12" y2="12" />
+          <line x1="19" x2="22" y1="12" y2="12" />
+          <line x1="12" x2="12" y1="2" y2="5" />
+          <line x1="12" x2="12" y1="19" y2="22" />
+          <circle cx="12" cy="12" r="7" />
+          <circle cx="12" cy="12" r="3" />
+        </svg>
+      </button>
 
       {/* Gamification Badges Overlay */}
       <div className="badge-overlay">
