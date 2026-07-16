@@ -41,32 +41,66 @@ function getCategoryGroup(category?: string): CategoryGroup {
 
 // Validated categorical palette (dataviz skill): the first 4 slots (blue,
 // green, magenta, yellow) pass all-pairs CVD/contrast checks; "other" uses a
-// neutral gray rather than a 5th competing hue.
-const GROUP_STYLES: Record<CategoryGroup, { color: string; label: string; icon: string }> = {
+// neutral gray rather than a 5th competing hue. Labels are static/bilingual
+// since these 5 buckets are our own invented taxonomy, not source data.
+const GROUP_STYLES: Record<CategoryGroup, { color: string; label: { en: string; ko: string }; icon: string }> = {
   education: {
     color: '#2a78d6',
-    label: 'Education & Mentoring',
+    label: { en: 'Education & Mentoring', ko: '교육 및 멘토링' },
     icon: '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>',
   },
   environment: {
     color: '#008300',
-    label: 'Environment & Nature',
+    label: { en: 'Environment & Nature', ko: '환경 및 자연' },
     icon: '<path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 3.5 1 8a8.5 8.5 0 0 1-9 10Z"></path><path d="M19 2c-2.26 4.33-5.27 7.14-8 10"></path>',
   },
   health: {
     color: '#e87ba4',
-    label: 'Health & Care',
+    label: { en: 'Health & Care', ko: '보건 및 돌봄' },
     icon: '<path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 1 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>',
   },
   safety: {
     color: '#eda100',
-    label: 'Safety & Public Service',
+    label: { en: 'Safety & Public Service', ko: '안전 및 공공서비스' },
     icon: '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>',
   },
   other: {
     color: '#898781',
-    label: 'Other',
+    label: { en: 'Other', ko: '기타' },
     icon: '<path d="M20.59 13.41 11 3.83A2 2 0 0 0 9.83 3H4a1 1 0 0 0-1 1v5.83a2 2 0 0 0 .59 1.41l9.58 9.58a2 2 0 0 0 2.83 0l4.59-4.59a2 2 0 0 0 0-2.83z"></path><circle cx="7.5" cy="7.5" r="1.5" fill="white" stroke="none"></circle>',
+  },
+};
+
+// Static UI chrome strings — these are our own fixed labels, not source data,
+// so a translation dictionary is the right tool rather than a Gemini call.
+const UI_TEXT = {
+  en: {
+    badgesTitle: 'Volunteer Impact Badges',
+    badgeName: 'Seoul Explorer',
+    badgeDescUnlocked: 'Discovered your first volunteer opportunity!',
+    badgeDescLocked: 'Click any map marker to unlock',
+    org: 'Org:',
+    address: 'Address:',
+    notAvailable: 'N/A',
+    volunteerOpportunity: 'Volunteer Opportunity',
+    kmAway: 'km away',
+    share: 'Share',
+    linkCopied: 'Link Copied!',
+    recenterTitle: 'Recenter Map to My Location',
+  },
+  ko: {
+    badgesTitle: '봉사활동 임팩트 배지',
+    badgeName: '서울 탐험가',
+    badgeDescUnlocked: '첫 자원봉사 기회를 발견했습니다!',
+    badgeDescLocked: '지도 마커를 클릭하여 잠금 해제',
+    org: '기관:',
+    address: '주소:',
+    notAvailable: '정보 없음',
+    volunteerOpportunity: '자원봉사 기회',
+    kmAway: 'km 거리',
+    share: '공유',
+    linkCopied: '링크 복사됨!',
+    recenterTitle: '내 위치로 이동',
   },
 };
 
@@ -76,7 +110,9 @@ export default function MapComponent() {
   const mapInitialized = useRef(false);
 
   const [selectedEvent, setSelectedEvent] = useState<VolunteerEvent | null>(null);
-  const [isTranslating, setIsTranslating] = useState(false);
+  const [language, setLanguage] = useState<'ko' | 'en'>('ko');
+  const [translationCache, setTranslationCache] = useState<Record<string, { title: string; organization?: string; address?: string }>>({});
+  const [translatingId, setTranslatingId] = useState<string | null>(null);
   const [clickedCount, setClickedCount] = useState(0);
   const [isLocating, setIsLocating] = useState(false);
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
@@ -252,41 +288,79 @@ export default function MapComponent() {
     };
   }, [map]);
 
-  const handleTranslate = async () => {
-    if (!selectedEvent) return;
-    setIsTranslating(true);
-    try {
-      const response = await fetch('/api/translate', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          eventId: selectedEvent.id,
-          title: selectedEvent.title,
-          organization: selectedEvent.organization,
-          lang: 'English',
-        }),
+  // Load the saved language preference once on mount.
+  useEffect(() => {
+    const saved = window.localStorage.getItem('vmk-language');
+    if (saved === 'ko' || saved === 'en') setLanguage(saved);
+  }, []);
+
+  const handleSetLanguage = (lang: 'ko' | 'en') => {
+    setLanguage(lang);
+    window.localStorage.setItem('vmk-language', lang);
+  };
+
+  // Korean is the default (matches the source data). English comes either
+  // from a static pre-set translation (mock data's translatedTitle) or,
+  // failing that, an on-demand Gemini call — cached per event so switching
+  // back and forth doesn't re-translate.
+  const translatingRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (!selectedEvent || language !== 'en') return;
+    if (selectedEvent.translatedTitle) return;
+    if (translationCache[selectedEvent.id]) return;
+    if (translatingRef.current === selectedEvent.id) return;
+
+    let cancelled = false;
+    translatingRef.current = selectedEvent.id;
+    setTranslatingId(selectedEvent.id);
+
+    fetch('/api/translate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        eventId: selectedEvent.id,
+        title: selectedEvent.title,
+        organization: selectedEvent.organization,
+        address: selectedEvent.location?.address,
+        lang: 'English',
+      }),
+    })
+      .then((res) => (res.ok ? res.json() : Promise.reject(new Error('Translation failed'))))
+      .then((data) => {
+        if (cancelled) return;
+        setTranslationCache((prev) => ({
+          ...prev,
+          [selectedEvent.id]: { title: data.title, organization: data.organization, address: data.address },
+        }));
+      })
+      .catch((err) => console.error('Auto-translate failed:', err))
+      .finally(() => {
+        if (cancelled) return;
+        translatingRef.current = null;
+        setTranslatingId((current) => (current === selectedEvent.id ? null : current));
       });
 
-      if (response.ok) {
-        const data = await response.json();
-        setSelectedEvent((prev) => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            title: data.title,
-            organization: data.organization,
-          };
-        });
-      } else {
-        console.error('Translation failed');
-      }
-    } catch (err) {
-      console.error('Error during translation:', err);
-    } finally {
-      setIsTranslating(false);
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedEvent, language, translationCache]);
+
+  // Resolves what to actually display for the current language setting.
+  const getDisplayText = (event: VolunteerEvent) => {
+    const address = event.location?.address;
+    if (language === 'ko') {
+      return { title: event.title, organization: event.organization, address, isTranslating: false };
     }
+    if (event.translatedTitle) {
+      // Mock data's address is already static English; no translation needed.
+      return { title: event.translatedTitle, organization: event.organization, address, isTranslating: false };
+    }
+    const cached = translationCache[event.id];
+    if (cached) {
+      return { title: cached.title, organization: cached.organization, address: cached.address || address, isTranslating: false };
+    }
+    return { title: event.title, organization: event.organization, address, isTranslating: translatingId === event.id };
   };
 
   const handleLocate = () => {
@@ -364,8 +438,8 @@ export default function MapComponent() {
         className="gps-button"
         onClick={handleLocate}
         disabled={isLocating}
-        title="Recenter Map to My Location"
-        aria-label="Recenter Map to My Location"
+        title={UI_TEXT[language].recenterTitle}
+        aria-label={UI_TEXT[language].recenterTitle}
       >
         <svg
           xmlns="http://www.w3.org/2000/svg"
@@ -388,79 +462,92 @@ export default function MapComponent() {
         </svg>
       </button>
 
+      {/* Language Setting */}
+      <div className="lang-toggle">
+        <button
+          className={`lang-btn ${language === 'ko' ? 'active' : ''}`}
+          onClick={() => handleSetLanguage('ko')}
+        >
+          한국어
+        </button>
+        <button
+          className={`lang-btn ${language === 'en' ? 'active' : ''}`}
+          onClick={() => handleSetLanguage('en')}
+        >
+          English
+        </button>
+      </div>
+
       {/* Category Color Legend */}
       <div className="category-legend">
         {(Object.keys(GROUP_STYLES) as CategoryGroup[]).map((group) => (
           <div key={group} className="legend-row">
             <span className="legend-dot" style={{ backgroundColor: GROUP_STYLES[group].color }} />
-            <span className="legend-label">{GROUP_STYLES[group].label}</span>
+            <span className="legend-label">{GROUP_STYLES[group].label[language]}</span>
           </div>
         ))}
       </div>
 
       {/* Gamification Badges Overlay */}
       <div className="badge-overlay">
-        <h3 className="badge-overlay-title">Volunteer Impact Badges</h3>
+        <h3 className="badge-overlay-title">{UI_TEXT[language].badgesTitle}</h3>
         {clickedCount >= 1 ? (
           <div className="badge-item unlocked">
             <div className="badge-icon">🌟</div>
             <div className="badge-info">
-              <span className="badge-name">Seoul Explorer</span>
-              <span className="badge-desc">Discovered your first volunteer opportunity!</span>
+              <span className="badge-name">{UI_TEXT[language].badgeName}</span>
+              <span className="badge-desc">{UI_TEXT[language].badgeDescUnlocked}</span>
             </div>
           </div>
         ) : (
           <div className="badge-item locked">
             <div className="badge-icon">🔒</div>
             <div className="badge-info">
-              <span className="badge-name">Seoul Explorer</span>
-              <span className="badge-desc">Click any map marker to unlock</span>
+              <span className="badge-name">{UI_TEXT[language].badgeName}</span>
+              <span className="badge-desc">{UI_TEXT[language].badgeDescLocked}</span>
             </div>
           </div>
         )}
       </div>
 
       {/* Selected Event Floating Overlay Card */}
-      {selectedEvent && (
-        <div className="glass-card">
-          <button className="btn-close" onClick={() => setSelectedEvent(null)}>
-            &times;
-          </button>
-          <h2 style={{ fontSize: '18px', margin: '0 0 8px 0', paddingRight: '20px' }}>
-            {selectedEvent.title}
-          </h2>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#334155', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>
-            <span
-              className="legend-dot"
-              style={{ backgroundColor: GROUP_STYLES[getCategoryGroup(selectedEvent.category)].color }}
-            />
-            {selectedEvent.category || 'Volunteer Opportunity'}
-            {userPos && selectedEvent.location && (
-              <span style={{ color: '#64748b', fontWeight: 500, textTransform: 'none' }}>
-                {' '}· {getDistanceKm(userPos, selectedEvent.location).toFixed(1)} km away
-              </span>
-            )}
-          </div>
-          <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
-            <strong>Org:</strong> {selectedEvent.organization || 'N/A'}
-          </div>
-          <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
-            <strong>Address:</strong> {selectedEvent.location?.address || 'N/A'}
-          </div>
-          <div className="card-actions">
-            <button
-              className="btn-translate"
-              onClick={handleTranslate}
-              disabled={isTranslating}
-            >
-              {isTranslating ? 'Translating...' : 'Translate with Gemini AI'}
+      {selectedEvent && (() => {
+        const display = getDisplayText(selectedEvent);
+        return (
+          <div className="glass-card">
+            <button className="btn-close" onClick={() => setSelectedEvent(null)}>
+              &times;
             </button>
-            <button className="btn-share" onClick={handleShare}>
-              {shareStatus === 'copied' ? 'Link Copied!' : 'Share'}
-            </button>
+            <h2 style={{ fontSize: '18px', margin: '0 0 8px 0', paddingRight: '20px' }}>
+              {display.title}
+              {display.isTranslating && <span className="translating-hint"> (translating…)</span>}
+            </h2>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', color: '#334155', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>
+              <span
+                className="legend-dot"
+                style={{ backgroundColor: GROUP_STYLES[getCategoryGroup(selectedEvent.category)].color }}
+              />
+              {selectedEvent.category ? GROUP_STYLES[getCategoryGroup(selectedEvent.category)].label[language] : UI_TEXT[language].volunteerOpportunity}
+              {userPos && selectedEvent.location && (
+                <span style={{ color: '#64748b', fontWeight: 500, textTransform: 'none' }}>
+                  {' '}· {getDistanceKm(userPos, selectedEvent.location).toFixed(1)} {UI_TEXT[language].kmAway}
+                </span>
+              )}
+            </div>
+            <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
+              <strong>{UI_TEXT[language].org}</strong> {display.organization || UI_TEXT[language].notAvailable}
+            </div>
+            <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
+              <strong>{UI_TEXT[language].address}</strong> {display.address || UI_TEXT[language].notAvailable}
+            </div>
+            <div className="card-actions">
+              <button className="btn-share" onClick={handleShare}>
+                {shareStatus === 'copied' ? UI_TEXT[language].linkCopied : UI_TEXT[language].share}
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
