@@ -600,7 +600,7 @@ git commit -m "feat(sync-job): detail-fetch prioritization (new-first, then olde
 
 **Interfaces:**
 - Consumes: `extractItems`, `extractTagValue` from `./xml.ts` (Task 2).
-- Produces: `class CallBudgetExceededError extends Error`, `class DataGoKrClient` with `constructor(serviceKey: string, budget: number, fetchImpl?: typeof fetch)`, `fetchListPage(pageNo: number): Promise<{ items: string[]; totalCount: number }>`, `fetchDetail(id: string): Promise<string>`, `get callsMade(): number` — consumed by Task 8's orchestrator.
+- Produces: `class CallBudgetExceededError extends Error`, `class DataGoKrClient` with `constructor(serviceKey: string, budget: number, fetchImpl?: typeof fetch)`, `fetchListPage(pageNo: number): Promise<{ items: string[]; totalCount: number }>`, `fetchDetail(id: string): Promise<string>`, `get callsMade(): number`, `get remainingBudget(): number` — consumed by Task 8's orchestrator, which derives its phase-3 budget from `client.remainingBudget` rather than duplicating the `950` constant.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -642,6 +642,11 @@ test('a call beyond the budget throws CallBudgetExceededError before making a re
   await assert.rejects(() => client.fetchListPage(2), CallBudgetExceededError);
   assert.equal(client.callsMade, 1);
 });
+
+test('remainingBudget reflects the budget minus calls made', () => {
+  const client = new DataGoKrClient('KEY', 10, fakeFetch({}));
+  assert.equal(client.remainingBudget, 10);
+});
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -678,6 +683,10 @@ export class DataGoKrClient {
 
   get callsMade(): number {
     return this.calls;
+  }
+
+  get remainingBudget(): number {
+    return this.budget - this.calls;
   }
 
   private async request(url: string): Promise<string> {
@@ -1040,7 +1049,7 @@ export async function runSync(
     if (!(error instanceof CallBudgetExceededError)) throw error;
   }
 
-  const remainingBudget = 950 - client.callsMade;
+  const remainingBudget = client.remainingBudget;
   let detailFetched = 0;
 
   if (remainingBudget > 0) {
