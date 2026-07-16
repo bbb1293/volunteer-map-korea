@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 Title: ${event.title}
 Organization: ${event.organization}`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(geminiUrl, {
       method: 'POST',
@@ -43,7 +43,7 @@ Organization: ${event.organization}`;
       throw new Error('Invalid response from Gemini');
     }
 
-    const result = JSON.parse(text);
+    const result = extractJSON(text);
     return NextResponse.json({
       title: result.title,
       organization: result.organization,
@@ -52,4 +52,28 @@ Organization: ${event.organization}`;
     console.error('Translation error:', error);
     return NextResponse.json({ error: 'Failed to translate' }, { status: 500 });
   }
+}
+
+function extractJSON(text: string): any {
+  const firstBrace = text.indexOf('{');
+  if (firstBrace === -1) {
+    throw new Error('No JSON object found in response');
+  }
+  
+  const lastBrace = text.lastIndexOf('}');
+  if (lastBrace === -1) {
+    throw new Error('No JSON object found in response');
+  }
+  
+  let currentEnd = lastBrace;
+  while (currentEnd >= firstBrace) {
+    const candidate = text.substring(firstBrace, currentEnd + 1);
+    try {
+      return JSON.parse(candidate);
+    } catch {
+      currentEnd = text.lastIndexOf('}', currentEnd - 1);
+    }
+  }
+  
+  throw new Error('Could not parse a valid JSON object from response');
 }

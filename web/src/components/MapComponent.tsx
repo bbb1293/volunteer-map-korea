@@ -29,6 +29,15 @@ export default function MapComponent() {
     let active = true;
     let timerId: NodeJS.Timeout;
 
+    // Suppress ApiProjectMapError to prevent Next.js dev overlay from blocking the UI
+    // when using DEMO_MAP_ID with a real API key.
+    const origError = console.error;
+    console.error = (...args) => {
+      const msg = typeof args[0] === 'string' ? args[0] : (args[0]?.message || '');
+      if (msg.includes('ApiProjectMapError')) return;
+      origError.apply(console, args);
+    };
+
     const initMap = () => {
       if (
         mapRef.current &&
@@ -110,6 +119,7 @@ export default function MapComponent() {
 
     return () => {
       active = false;
+      console.error = origError; // Restore original console.error
       if (timerId) clearTimeout(timerId);
       mapInitialized.current = false; // Reset to support Strict Mode remounts
       markersRef.current.forEach((m) => {
