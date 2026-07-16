@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
+import Script from "next/script";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -22,12 +23,20 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const mapsKey = process.env.GOOGLE_MAPS_API_KEY || '';
+
   return (
     <html
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        <Script
+          src={`https://maps.googleapis.com/maps/api/js?key=${mapsKey}&loading=async&libraries=marker`}
+          strategy="beforeInteractive"
+        />
+        {children}
+      </body>
     </html>
   );
 }
