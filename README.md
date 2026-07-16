@@ -63,6 +63,7 @@ flowchart LR
             API_Vol("🌐 /api/volunteers"):::gcpNode
             API_Chat("💬 /api/chat"):::gcpNode
             API_Met("📊 /api/metrics"):::gcpNode
+            API_Trans("🗣️ /api/translate"):::gcpNode
             Cache[("💾 Local JSON")]:::dbNode
         end
         
@@ -97,6 +98,7 @@ flowchart LR
     API_Vol -.->|"Fallback"| Cache
     
     API_Chat ==>|"Prompts"| Gem
+    API_Trans ==>|"Prompts"| Gem
     
     Sec -.->|"Injects Keys"| CloudRun
     Art -.->|"Deploys Container"| CloudRun
@@ -104,6 +106,7 @@ flowchart LR
     API_Met -->|"Logs"| Log
     API_Vol -->|"Traces"| Trace
     API_Chat -->|"Traces"| Trace
+    API_Trans -->|"Traces"| Trace
     CloudRun -->|"Metrics"| Mon
 ```
 
@@ -142,6 +145,11 @@ flowchart LR
    DATA_GO_KR_API_KEY=your_data_go_kr_key
    NEXT_PUBLIC_GOOGLE_MAPS_MAP_ID=your_map_id
    ```
+
+   > [!NOTE]
+   > **Why do we need local keys if we use GCP Secret Manager in production?**
+   > * **In Production (Cloud Run):** Environment variables are securely injected directly into the container from GCP Secret Manager, so secrets are never hardcoded or exposed in Git.
+   > * **In Local Development:** Since your local machine does not run inside the GCP environment, it cannot automatically inherit those secrets. To keep local development simple, fast, and isolated without requiring complex GCP credentials setup on your machine, we use `.env.local` (which is ignored by Git via `.gitignore`) to supply the keys. The code accesses them the exact same way in both environments via `process.env`.
 
 4. **Run the development server:**
    ```bash
