@@ -26,7 +26,60 @@ By aggregating national public data and presenting it geographically, we provide
 
 ## 🏗️ Architecture
 
-![Volunteer Map Korea Architecture](./docs/assets/architecture_diagram.png)
+```mermaid
+graph TD
+    User([User Browser])
+    
+    subgraph Frontend [Next.js Client]
+        Map[Google Maps Component]
+        ChatUI[Gemini Chat UI]
+    end
+    
+    subgraph GCP_Infra [Google Cloud Platform Infrastructure]
+        subgraph Compute [Serverless Compute]
+            subgraph CloudRun [Cloud Run container]
+                API_Volunteers["/api/volunteers"]
+                API_Chat["/api/chat"]
+                API_Metrics["/api/metrics"]
+                Cache[("Local JSON Fallback")]
+            end
+        end
+        
+        SecretManager[("Secret Manager<br/>(API Keys)")]
+        ArtifactRegistry[("Artifact Registry<br/>(Docker Images)")]
+        
+        subgraph Observability [Operations Suite]
+            Logging["Cloud Logging"]
+            Monitoring["Cloud Monitoring"]
+            Trace["Cloud Trace"]
+        end
+    end
+    
+    subgraph External_Services [External APIs]
+        GovAPI["1365 Portal API<br/>(data.go.kr)"]
+        Gemini["Gemini 1.5 Flash<br/>(AI Studio)"]
+        GoogleMapsAPI["Google Maps Platform"]
+    end
+    
+    User -->|Views & Interacts| Frontend
+    Frontend -- Map Data --> GoogleMapsAPI
+    
+    Frontend -- GET /api/volunteers --> API_Volunteers
+    Frontend -- POST /api/chat --> API_Chat
+    Frontend -- POST /api/metrics --> API_Metrics
+    
+    SecretManager -. Injects Secrets .-> CloudRun
+    ArtifactRegistry -. Deploys Container to .-> CloudRun
+    
+    API_Volunteers -- Fetches XML Data --> GovAPI
+    API_Volunteers -. API Timeout/Failure .-> Cache
+    API_Chat -- Prompts & Context --> Gemini
+    
+    CloudRun --> Logging
+    CloudRun --> Monitoring
+    API_Volunteers --> Trace
+    API_Chat --> Trace
+```
 
 ## 🚀 Technology Stack
 *   **Framework:** Next.js 14 (App Router)
