@@ -20,6 +20,10 @@ export default function MapComponent() {
   const [map, setMap] = useState<google.maps.Map | null>(null);
   const mapInitialized = useRef(false);
 
+  const [selectedEvent, setSelectedEvent] = useState<VolunteerEvent | null>(null);
+  const [isTranslating, setIsTranslating] = useState(false);
+  const [clickedCount, setClickedCount] = useState(0);
+
   useEffect(() => {
     let active = true;
     let timerId: NodeJS.Timeout;
@@ -57,7 +61,8 @@ export default function MapComponent() {
                   });
 
                   marker.addListener('click', () => {
-                    alert(`Clicked event: ${event.id}`);
+                    setSelectedEvent(event);
+                    setClickedCount((prev) => prev + 1);
                   });
                 }
               });
@@ -89,5 +94,95 @@ export default function MapComponent() {
     };
   }, []);
 
-  return <div ref={mapRef} style={{ width: '100%', height: '100vh' }} />;
+  const handleTranslate = async () => {
+    if (!selectedEvent) return;
+    setIsTranslating(true);
+    try {
+      const response = await fetch('/api/translate', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          eventId: selectedEvent.id,
+          lang: 'English',
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setSelectedEvent((prev) => {
+          if (!prev) return null;
+          return {
+            ...prev,
+            title: data.title,
+            organization: data.organization,
+          };
+        });
+      } else {
+        console.error('Translation failed');
+      }
+    } catch (err) {
+      console.error('Error during translation:', err);
+    } finally {
+      setIsTranslating(false);
+    }
+  };
+
+  return (
+    <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
+      <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+
+      {/* Gamification Badges Overlay */}
+      <div className="badge-overlay">
+        <h3 className="badge-overlay-title">Volunteer Impact Badges</h3>
+        {clickedCount >= 1 ? (
+          <div className="badge-item unlocked">
+            <div className="badge-icon">🌟</div>
+            <div className="badge-info">
+              <span className="badge-name">Seoul Explorer</span>
+              <span className="badge-desc">Discovered your first volunteer opportunity!</span>
+            </div>
+          </div>
+        ) : (
+          <div className="badge-item locked">
+            <div className="badge-icon">🔒</div>
+            <div className="badge-info">
+              <span className="badge-name">Seoul Explorer</span>
+              <span className="badge-desc">Click any map marker to unlock</span>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Selected Event Floating Overlay Card */}
+      {selectedEvent && (
+        <div className="glass-card">
+          <button className="btn-close" onClick={() => setSelectedEvent(null)}>
+            &times;
+          </button>
+          <h2 style={{ fontSize: '18px', margin: '0 0 8px 0', paddingRight: '20px' }}>
+            {selectedEvent.title}
+          </h2>
+          <div style={{ fontSize: '12px', color: '#2563eb', fontWeight: 600, textTransform: 'uppercase', marginBottom: '8px' }}>
+            {selectedEvent.category || 'Volunteer Opportunity'}
+          </div>
+          <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
+            <strong>Org:</strong> {selectedEvent.organization || 'N/A'}
+          </div>
+          <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
+            <strong>Address:</strong> {selectedEvent.location?.address || 'N/A'}
+          </div>
+          <button
+            className="btn-translate"
+            onClick={handleTranslate}
+            disabled={isTranslating}
+          >
+            {isTranslating ? 'Translating...' : 'Translate with Gemini AI'}
+          </button>
+        </div>
+      )}
+    </div>
+  );
 }
+

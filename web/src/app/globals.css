@@ -11,3 +11,163 @@ body {
   background-color: var(--bg);
   color: var(--text);
 }
+
+/* Glassmorphism Floating Card */
+.glass-card {
+  position: absolute;
+  bottom: 24px;
+  left: 24px;
+  width: calc(100% - 48px);
+  max-width: 400px;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+  z-index: 1000;
+  color: #1e293b;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+/* Badge Overlay */
+.badge-overlay {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 280px;
+  background: rgba(255, 255, 255, 0.8);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 16px;
+  padding: 16px;
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
+  z-index: 1000;
+  color: #1e293b;
+  transition: all 0.3s ease;
+  box-sizing: border-box;
+}
+
+.badge-overlay-title {
+  margin: 0 0 12px 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: #1e293b;
+  border-bottom: 1px solid rgba(30, 41, 59, 0.1);
+  padding-bottom: 8px;
+}
+
+.badge-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 8px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.5);
+  transition: background 0.2s ease;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.badge-item.locked {
+  opacity: 0.6;
+}
+
+.badge-item.unlocked {
+  background: rgba(254, 240, 138, 0.3);
+  border-color: rgba(234, 179, 8, 0.3);
+}
+
+.badge-icon {
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(241, 245, 249, 0.8);
+  flex-shrink: 0;
+}
+
+.badge-item.unlocked .badge-icon {
+  background: radial-gradient(circle, #fde047 0%, #eab308 100%);
+  color: #ffffff;
+  animation: glow 2s infinite alternate;
+  box-shadow: 0 0 10px rgba(234, 179, 8, 0.5);
+}
+
+.badge-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.badge-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+.badge-desc {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 2px;
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 4px rgba(234, 179, 8, 0.3);
+  }
+  to {
+    box-shadow: 0 0 12px rgba(234, 179, 8, 0.7);
+  }
+}
+
+.btn-translate {
+  background: #2563eb;
+  color: #ffffff;
+  border: none;
+  padding: 10px 16px;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  width: 100%;
+  margin-top: 12px;
+  transition: background 0.2s ease;
+}
+
+.btn-translate:hover {
+  background: #1d4ed8;
+}
+
+.btn-translate:disabled {
+  background: #94a3b8;
+  cursor: not-allowed;
+}
+
+.btn-close {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  background: none;
+  border: none;
+  font-size: 18px;
+  cursor: pointer;
+  color: #64748b;
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.btn-close:hover {
+  background: rgba(15, 23, 42, 0.05);
+  color: #1e293b;
+}
+
