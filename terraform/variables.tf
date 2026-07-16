@@ -34,3 +34,9 @@ variable "data_go_kr_api_key" {
   default     = ""
 }
 
+variable "kakao_map_app_key" {
+  description = "Kakao Maps JavaScript SDK app key"
+  type        = string
+  sensitive   = true
+}
+

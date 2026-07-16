@@ -25,7 +25,7 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const mapsKey = process.env.GOOGLE_MAPS_API_KEY || '';
+  const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_MAP_APP_KEY || '';
 
   return (
     <html
@@ -34,7 +34,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <Script
-          src={`https://maps.googleapis.com/maps/api/js?key=${mapsKey}&loading=async&libraries=marker`}
+          src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoAppKey}&autoload=false`}
           strategy="beforeInteractive"
         />
         {children}

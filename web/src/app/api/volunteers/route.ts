@@ -191,14 +191,38 @@ export async function GET() {
       const address = extractTagValue(itemXml, 'actPlace');
       const categoryCode = extractTagValue(itemXml, 'srvcClCode');
       const category = CATEGORY_NAMES[categoryCode] || categoryCode || 'Volunteer';
-      const startDate = formatDate(extractTagValue(itemXml, 'progrmBgnde'));
-      const endDate = formatDate(extractTagValue(itemXml, 'progrmEndde'));
+      const startDateRaw = extractTagValue(itemXml, 'progrmBgnde');
+      const endDateRaw = extractTagValue(itemXml, 'progrmEndde');
+      const startDate = formatDate(startDateRaw);
+      const endDate = formatDate(endDateRaw);
       const startTime = formatTime(extractTagValue(itemXml, 'actBeginTm'));
       const endTime = formatTime(extractTagValue(itemXml, 'actEndTm'));
       const externalUrl = extractTagValue(itemXml, 'url') || undefined;
+      // 모집기간 (application/recruitment window) — distinct from the activity
+      // dates above: an event can still be open for applications, or already
+      // closed to new applicants, independent of when the activity itself runs.
+      const recruitStartDate = formatDate(extractTagValue(itemXml, 'noticeBgnde'));
+      const recruitEndDate = formatDate(extractTagValue(itemXml, 'noticeEndde'));
 
       if (!id || !title) {
         return null;
+      }
+
+      // Skip listings whose activity period has already fully ended — a
+      // stale/expired listing showing up on the map is confusing regardless
+      // of why it slipped through (deep pagination, cache timing, etc.).
+      // Only filter when we can actually parse a date; unknown stays visible.
+      const referenceDateRaw = endDateRaw || startDateRaw;
+      if (referenceDateRaw && referenceDateRaw.length === 8) {
+        const y = parseInt(referenceDateRaw.slice(0, 4), 10);
+        const m = parseInt(referenceDateRaw.slice(4, 6), 10);
+        const d = parseInt(referenceDateRaw.slice(6, 8), 10);
+        const refDate = new Date(y, m - 1, d);
+        const todayStart = new Date();
+        todayStart.setHours(0, 0, 0, 0);
+        if (!isNaN(refDate.getTime()) && refDate < todayStart) {
+          return null;
+        }
       }
 
       let coords: { lat: number; lng: number } | null = null;
@@ -247,6 +271,8 @@ export async function GET() {
         endDate,
         startTime,
         endTime,
+        recruitStartDate,
+        recruitEndDate,
         externalUrl,
         description,
         spotsNeeded,

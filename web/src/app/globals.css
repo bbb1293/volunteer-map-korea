@@ -19,7 +19,7 @@ body {
   left: 24px;
   width: calc(100% - 48px);
   max-width: 400px;
-  max-height: calc(100vh - 48px);
+  max-height: 70vh;
   overflow-y: auto;
   background: rgba(255, 255, 255, 0.75);
   backdrop-filter: blur(12px);
@@ -55,11 +55,49 @@ body {
   }
 }
 
-/* Badge Overlay */
-.badge-overlay {
+/* Top-left/top-right overlay stacks: flex columns/rows so sibling overlays
+   (legend, language toggle, GPS button, badges) stack in normal document
+   flow instead of independent absolutely-positioned boxes with guessed
+   pixel gaps between them (which broke as soon as content height changed,
+   e.g. on narrow mobile viewports). */
+.overlay-stack {
   position: absolute;
+  z-index: 1000;
+  display: flex;
+  gap: 12px;
+}
+
+.overlay-stack-left {
+  top: 24px;
+  left: 24px;
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.overlay-stack-right {
   top: 24px;
   right: 24px;
+  flex-direction: row;
+  align-items: flex-start;
+}
+
+@media (max-width: 640px) {
+  .overlay-stack-left {
+    top: 10px;
+    left: 10px;
+    gap: 8px;
+  }
+  .overlay-stack-right {
+    top: 10px;
+    right: 10px;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 8px;
+  }
+}
+
+/* Badge Overlay */
+.badge-overlay {
   width: 280px;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(12px);
@@ -68,10 +106,10 @@ body {
   border-radius: 16px;
   padding: 16px;
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-  z-index: 1000;
   color: #1e293b;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .badge-overlay-title {
@@ -252,11 +290,8 @@ body {
 
 @media (max-width: 640px) {
   .badge-overlay {
-    top: 10px;
-    right: 10px;
-    left: 10px;
-    width: auto;
-    max-width: none;
+    width: 200px;
+    padding: 12px;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
   }
   .glass-card {
@@ -266,17 +301,10 @@ body {
     max-width: none;
     margin-right: 10px;
   }
-  .gps-button {
-    top: 140px;
-    right: 16px;
-  }
 }
 
 /* Glassmorphic GPS Button */
 .gps-button {
-  position: absolute;
-  top: 24px;
-  right: 320px;
   width: 48px;
   height: 48px;
   background: rgba(255, 255, 255, 0.75);
@@ -285,7 +313,6 @@ body {
   border: 1px solid rgba(255, 255, 255, 0.3);
   border-radius: 50%;
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-  z-index: 1000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -293,6 +320,7 @@ body {
   color: #1e293b;
   transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .gps-button:hover {
@@ -314,9 +342,6 @@ body {
 
 /* Language Setting Toggle */
 .lang-toggle {
-  position: absolute;
-  top: 190px;
-  left: 24px;
   display: flex;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(12px);
@@ -325,8 +350,8 @@ body {
   border-radius: 12px;
   padding: 4px;
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-  z-index: 1000;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .lang-btn {
@@ -346,13 +371,6 @@ body {
   color: #ffffff;
 }
 
-@media (max-width: 640px) {
-  .lang-toggle {
-    top: 10px;
-    left: 10px;
-  }
-}
-
 .translating-hint {
   font-size: 13px;
   font-weight: 400;
@@ -361,9 +379,6 @@ body {
 
 /* Category Color Legend */
 .category-legend {
-  position: absolute;
-  top: 24px;
-  left: 24px;
   background: rgba(255, 255, 255, 0.8);
   backdrop-filter: blur(12px);
   -webkit-backdrop-filter: blur(12px);
@@ -371,8 +386,8 @@ body {
   border-radius: 16px;
   padding: 12px 16px;
   box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.15);
-  z-index: 1000;
   box-sizing: border-box;
+  flex-shrink: 0;
 }
 
 .legend-row {
@@ -417,7 +432,12 @@ body {
 
 @media (max-width: 640px) {
   .category-legend {
-    display: none;
+    padding: 8px 12px;
+    max-width: 46vw;
+  }
+  .legend-label {
+    font-size: 11px;
+    white-space: normal;
   }
 }
 
@@ -428,11 +448,9 @@ body {
   margin-top: 12px;
 }
 
-.btn-share {
-  width: 100%;
-  background: rgba(15, 23, 42, 0.06);
-  color: #1e293b;
-  border: 1px solid rgba(15, 23, 42, 0.1);
+.btn-share,
+.btn-directions {
+  flex: 1;
   padding: 10px 12px;
   border-radius: 8px;
   font-weight: 600;
@@ -440,11 +458,31 @@ body {
   transition: background 0.2s ease, transform 0.1s ease;
 }
 
+.btn-share {
+  background: rgba(15, 23, 42, 0.06);
+  color: #1e293b;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+}
+
 .btn-share:hover {
   background: rgba(15, 23, 42, 0.1);
 }
 
 .btn-share:active {
+  transform: scale(0.98);
+}
+
+.btn-directions {
+  background: #2563eb;
+  color: #ffffff;
+  border: 1px solid #2563eb;
+}
+
+.btn-directions:hover {
+  background: #1d4ed8;
+}
+
+.btn-directions:active {
   transform: scale(0.98);
 }
 

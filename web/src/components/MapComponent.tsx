@@ -12,6 +12,8 @@ interface VolunteerEvent {
   endDate?: string;
   startTime?: string;
   endTime?: string;
+  recruitStartDate?: string;
+  recruitEndDate?: string;
   externalUrl?: string;
   description?: string;
   spotsNeeded?: number;
@@ -109,10 +111,13 @@ const UI_TEXT = {
     recenterTitle: 'Recenter Map to My Location',
     when: 'When:',
     dailyTime: 'Daily time:',
+    recruitPeriod: 'Application period:',
     viewOriginal: 'View Original Listing ↗',
     description: 'Description:',
     spotsFilled: 'Spots filled:',
-    hideFullFilter: 'Hide full opportunities',
+    hideFullFilter: 'Hide filled opportunities',
+    directions: 'Directions',
+    myLocation: 'My Location',
   },
   ko: {
     badgesTitle: '봉사활동 임팩트 배지',
@@ -129,16 +134,19 @@ const UI_TEXT = {
     recenterTitle: '내 위치로 이동',
     when: '기간:',
     dailyTime: '활동 시간:',
+    recruitPeriod: '모집 기간:',
     viewOriginal: '1365 포털에서 원본 보기 ↗',
     description: '설명:',
     spotsFilled: '모집 현황:',
     hideFullFilter: '마감된 활동 숨기기',
+    directions: '길찾기',
+    myLocation: '내 위치',
   },
 };
 
 export default function MapComponent() {
   const mapRef = useRef<HTMLDivElement>(null);
-  const [map, setMap] = useState<google.maps.Map | null>(null);
+  const [map, setMap] = useState<kakao.maps.Map | null>(null);
   const mapInitialized = useRef(false);
 
   const [selectedEvent, setSelectedEvent] = useState<VolunteerEvent | null>(null);
@@ -149,124 +157,121 @@ export default function MapComponent() {
   const [isLocating, setIsLocating] = useState(false);
   const [userPos, setUserPos] = useState<{ lat: number; lng: number } | null>(null);
   const [shareStatus, setShareStatus] = useState<'idle' | 'copied'>('idle');
-  const [hideFullEvents, setHideFullEvents] = useState(false);
-  const hideFullRef = useRef(false);
-  const markersRef = useRef<{ marker: google.maps.marker.AdvancedMarkerElement; event: VolunteerEvent }[]>([]);
-  const userMarkerRef = useRef<google.maps.marker.AdvancedMarkerElement | null>(null);
+  const [hideFullEvents, setHideFullEvents] = useState(true);
+  const [events, setEvents] = useState<VolunteerEvent[]>([]);
+  const hideFullRef = useRef(true);
+  const markersRef = useRef<{ marker: kakao.maps.CustomOverlay; event: VolunteerEvent }[]>([]);
+  const userMarkerRef = useRef<kakao.maps.CustomOverlay | null>(null);
   const hasCenteredOnUser = useRef(false);
 
   useEffect(() => {
     let active = true;
     let timerId: NodeJS.Timeout;
+    let loadScheduled = false;
 
-    // Suppress ApiProjectMapError to prevent Next.js dev overlay from blocking the UI
-    // when using DEMO_MAP_ID with a real API key.
-    const origError = console.error;
-    console.error = (...args) => {
-      const msg = typeof args[0] === 'string' ? args[0] : (args[0]?.message || '');
-      if (msg.includes('ApiProjectMapError')) return;
-      origError.apply(console, args);
-    };
+    const buildMap = () => {
+      if (!active || !mapRef.current || mapInitialized.current) return;
 
-    const initMap = () => {
-      if (
-        mapRef.current &&
-        !mapInitialized.current &&
-        typeof google !== 'undefined' &&
-        google.maps?.marker?.AdvancedMarkerElement
-      ) {
-        const newMap = new google.maps.Map(mapRef.current, {
-          center: { lat: 37.5665, lng: 126.9780 },
-          zoom: 12,
-          mapId: process.env.NEXT_PUBLIC_MAP_ID || 'DEMO_MAP_ID',
-        });
-        setMap(newMap);
-        mapInitialized.current = true;
+      const newMap = new kakao.maps.Map(mapRef.current, {
+        center: new kakao.maps.LatLng(37.5665, 126.9780),
+        level: 7,
+      });
+      setMap(newMap);
+      mapInitialized.current = true;
 
-        fetch('/api/volunteers')
-          .then((res) => res.json())
-          .then((data) => {
-            if (!active) return;
-            if (data && Array.isArray(data.events)) {
-              data.events.forEach((event: VolunteerEvent) => {
-                if (
-                  event.location &&
-                  typeof event.location.lat === 'number' && !isNaN(event.location.lat) &&
-                  typeof event.location.lng === 'number' && !isNaN(event.location.lng)
-                ) {
-                  const pinContainer = document.createElement('div');
-                  pinContainer.className = 'custom-map-pin';
-                  const groupStyle = GROUP_STYLES[getCategoryGroup(event.category)];
-                  const pinColor = groupStyle.color;
-                  pinContainer.style.setProperty('--pin-color', pinColor);
+      fetch('/api/volunteers')
+        .then((res) => res.json())
+        .then((data) => {
+          if (!active) return;
+          if (data && Array.isArray(data.events)) {
+            setEvents(data.events);
+            data.events.forEach((event: VolunteerEvent) => {
+              if (
+                event.location &&
+                typeof event.location.lat === 'number' && !isNaN(event.location.lat) &&
+                typeof event.location.lng === 'number' && !isNaN(event.location.lng)
+              ) {
+                const pinContainer = document.createElement('div');
+                pinContainer.className = 'custom-map-pin';
+                pinContainer.title = event.translatedTitle || event.title;
+                const groupStyle = GROUP_STYLES[getCategoryGroup(event.category)];
+                const pinColor = groupStyle.color;
+                pinContainer.style.setProperty('--pin-color', pinColor);
 
-                  const svgIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">${groupStyle.icon}</svg>`;
+                const svgIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">${groupStyle.icon}</svg>`;
 
-                  pinContainer.innerHTML = `
-                    <div class="pin-pulse" style="background-color: ${pinColor}"></div>
-                    <div class="pin-core" style="background-color: ${pinColor}">
-                      ${svgIcon}
-                    </div>
-                  `;
+                pinContainer.innerHTML = `
+                  <div class="pin-pulse" style="background-color: ${pinColor}"></div>
+                  <div class="pin-core" style="background-color: ${pinColor}">
+                    ${svgIcon}
+                  </div>
+                `;
 
-                  const marker = new google.maps.marker.AdvancedMarkerElement({
-                    map: (hideFullRef.current && isFull(event)) ? null : newMap,
-                    position: { lat: event.location.lat, lng: event.location.lng },
-                    title: event.translatedTitle || event.title,
-                    content: pinContainer,
-                  });
+                const marker = new kakao.maps.CustomOverlay({
+                  map: (hideFullRef.current && isFull(event)) ? null : newMap,
+                  position: new kakao.maps.LatLng(event.location.lat, event.location.lng),
+                  content: pinContainer,
+                  xAnchor: 0.5,
+                  yAnchor: 0.5,
+                  zIndex: 1,
+                });
 
-                  markersRef.current.push({ marker, event });
+                markersRef.current.push({ marker, event });
 
-                  marker.addListener('click', () => {
-                    setSelectedEvent(event);
-                    setShareStatus('idle');
-                    setClickedCount((prev) => prev + 1);
-                  });
-                }
-              });
+                pinContainer.addEventListener('click', () => {
+                  setSelectedEvent(event);
+                  setShareStatus('idle');
+                  setClickedCount((prev) => prev + 1);
+                });
+              }
+            });
 
-              // If this page was opened via a shared link (?event=<id>), open
-              // that event's card and center the map on it instead of the
-              // default/geolocation center.
-              const sharedId = new URLSearchParams(window.location.search).get('event');
-              if (sharedId) {
-                const sharedEvent = data.events.find((e: VolunteerEvent) => e.id === sharedId);
-                if (sharedEvent?.location) {
-                  setSelectedEvent(sharedEvent);
-                  newMap.setCenter({ lat: sharedEvent.location.lat, lng: sharedEvent.location.lng });
-                  newMap.setZoom(16);
-                  hasCenteredOnUser.current = true; // don't let geolocation override the shared spot
-                }
+            // If this page was opened via a shared link (?event=<id>), open
+            // that event's card and center the map on it instead of the
+            // default/geolocation center.
+            const sharedId = new URLSearchParams(window.location.search).get('event');
+            if (sharedId) {
+              const sharedEvent = data.events.find((e: VolunteerEvent) => e.id === sharedId);
+              if (sharedEvent?.location) {
+                setSelectedEvent(sharedEvent);
+                newMap.setCenter(new kakao.maps.LatLng(sharedEvent.location.lat, sharedEvent.location.lng));
+                newMap.setLevel(3);
+                hasCenteredOnUser.current = true; // don't let geolocation override the shared spot
               }
             }
-          })
-          .catch((err) => {
-            if (!active) return;
-            console.error('Failed to fetch volunteer data:', err);
-          });
-
-        return true;
-      }
-      return mapInitialized.current;
+          }
+        })
+        .catch((err) => {
+          if (!active) return;
+          console.error('Failed to fetch volunteer data:', err);
+        });
     };
 
-    if (!initMap()) {
-      const checkGoogle = () => {
+    const tryInit = () => {
+      if (loadScheduled) return true;
+      if (typeof kakao !== 'undefined' && kakao.maps?.load) {
+        loadScheduled = true;
+        kakao.maps.load(buildMap);
+        return true;
+      }
+      return false;
+    };
+
+    if (!tryInit()) {
+      const checkKakao = () => {
         if (!active) return;
-        if (initMap()) return;
-        timerId = setTimeout(checkGoogle, 100);
+        if (tryInit()) return;
+        timerId = setTimeout(checkKakao, 100);
       };
-      timerId = setTimeout(checkGoogle, 100);
+      timerId = setTimeout(checkKakao, 100);
     }
 
     return () => {
       active = false;
-      console.error = origError; // Restore original console.error
       if (timerId) clearTimeout(timerId);
       mapInitialized.current = false; // Reset to support Strict Mode remounts
       markersRef.current.forEach(({ marker }) => {
-        marker.map = null;
+        marker.setMap(null);
       });
       markersRef.current = [];
     };
@@ -281,9 +286,10 @@ export default function MapComponent() {
       (position) => {
         const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
         setUserPos(pos);
+        const latlng = new kakao.maps.LatLng(pos.lat, pos.lng);
 
         if (userMarkerRef.current) {
-          userMarkerRef.current.position = pos;
+          userMarkerRef.current.setPosition(latlng);
         } else {
           const pinContainer = document.createElement('div');
           pinContainer.className = 'user-position-pin';
@@ -291,18 +297,19 @@ export default function MapComponent() {
             <div class="user-position-pulse"></div>
             <div class="user-position-core"></div>
           `;
-          userMarkerRef.current = new google.maps.marker.AdvancedMarkerElement({
+          userMarkerRef.current = new kakao.maps.CustomOverlay({
             map,
-            position: pos,
-            title: 'Your location',
+            position: latlng,
             content: pinContainer,
+            xAnchor: 0.5,
+            yAnchor: 0.5,
             zIndex: 500,
           });
         }
 
         if (!hasCenteredOnUser.current) {
-          map.setCenter(pos);
-          map.setZoom(14);
+          map.setCenter(latlng);
+          map.setLevel(5);
           hasCenteredOnUser.current = true;
         }
       },
@@ -315,7 +322,7 @@ export default function MapComponent() {
     return () => {
       navigator.geolocation.clearWatch(watchId);
       if (userMarkerRef.current) {
-        userMarkerRef.current.map = null;
+        userMarkerRef.current.setMap(null);
         userMarkerRef.current = null;
       }
       hasCenteredOnUser.current = false;
@@ -327,7 +334,7 @@ export default function MapComponent() {
     hideFullRef.current = hideFullEvents;
     if (!map) return;
     markersRef.current.forEach(({ marker, event }) => {
-      marker.map = hideFullEvents && isFull(event) ? null : map;
+      marker.setMap(hideFullEvents && isFull(event) ? null : map);
     });
   }, [hideFullEvents, map]);
 
@@ -422,8 +429,8 @@ export default function MapComponent() {
   const handleLocate = () => {
     if (!map) return;
     if (userPos) {
-      map.panTo(userPos);
-      map.setZoom(14);
+      map.panTo(new kakao.maps.LatLng(userPos.lat, userPos.lng));
+      map.setLevel(5);
       return;
     }
     if (!navigator.geolocation) {
@@ -434,8 +441,8 @@ export default function MapComponent() {
     navigator.geolocation.getCurrentPosition(
       (position) => {
         const pos = { lat: position.coords.latitude, lng: position.coords.longitude };
-        map.panTo(pos);
-        map.setZoom(14);
+        map.panTo(new kakao.maps.LatLng(pos.lat, pos.lng));
+        map.setLevel(5);
         setIsLocating(false);
       },
       (error) => {
@@ -447,11 +454,17 @@ export default function MapComponent() {
     );
   };
 
+  // Native share sheets are only worth it on touch devices, where they
+  // surface real one-tap targets like KakaoTalk/Messages. On desktop the OS
+  // share sheet just lists things like AirDrop/Mail/Notes, so skip straight
+  // to clipboard copy there instead.
+  const isMobileDevice = () => window.matchMedia('(pointer: coarse)').matches;
+
   const handleShare = async () => {
     if (!selectedEvent) return;
     const url = `${window.location.origin}${window.location.pathname}?event=${encodeURIComponent(selectedEvent.id)}`;
 
-    if (navigator.share) {
+    if (isMobileDevice() && navigator.share) {
       try {
         await navigator.share({
           title: selectedEvent.translatedTitle || selectedEvent.title,
@@ -473,6 +486,21 @@ export default function MapComponent() {
     }
   };
 
+  // Opens Kakao Map's own route-search page in a new tab, pre-filled with the
+  // destination (and the origin too, if we already have a GPS fix) so the
+  // user only has to pick the 대중교통(public transit)/car/walk tab there —
+  // Kakao's public link-sharing scheme doesn't expose a way to force a
+  // specific transport mode from the URL itself.
+  const handleDirections = () => {
+    if (!selectedEvent?.location) return;
+    const destName = encodeURIComponent(selectedEvent.translatedTitle || selectedEvent.title);
+    const destSegment = `${destName},${selectedEvent.location.lat},${selectedEvent.location.lng}`;
+    const url = userPos
+      ? `https://map.kakao.com/link/from/${encodeURIComponent(UI_TEXT[language].myLocation)},${userPos.lat},${userPos.lng}/to/${destSegment}`
+      : `https://map.kakao.com/link/to/${destSegment}`;
+    window.open(url, '_blank', 'noopener,noreferrer');
+  };
+
   // Haversine distance in km between the user and a volunteer event.
   const getDistanceKm = (a: { lat: number; lng: number }, b: { lat: number; lng: number }) => {
     const R = 6371;
@@ -489,89 +517,97 @@ export default function MapComponent() {
     <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
       <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
 
-      {/* GPS Target Button Overlay */}
-      <button
-        className="gps-button"
-        onClick={handleLocate}
-        disabled={isLocating}
-        title={UI_TEXT[language].recenterTitle}
-        aria-label={UI_TEXT[language].recenterTitle}
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="20"
-          height="20"
-          viewBox="0 0 24 24"
-          fill="none"
-          stroke="currentColor"
-          strokeWidth="2.5"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          className={isLocating ? 'spinning' : ''}
-        >
-          <line x1="2" x2="5" y1="12" y2="12" />
-          <line x1="19" x2="22" y1="12" y2="12" />
-          <line x1="12" x2="12" y1="2" y2="5" />
-          <line x1="12" x2="12" y1="19" y2="22" />
-          <circle cx="12" cy="12" r="7" />
-          <circle cx="12" cy="12" r="3" />
-        </svg>
-      </button>
+      {/* Top-left overlay stack: category legend + language toggle. Grouped in
+          one flex column so they stack in normal document flow instead of
+          guessing fixed pixel offsets between them (which broke on mobile
+          once the legend's content height differed from desktop). */}
+      <div className="overlay-stack overlay-stack-left">
+        <div className="category-legend">
+          {(Object.keys(GROUP_STYLES) as CategoryGroup[]).map((group) => (
+            <div key={group} className="legend-row">
+              <span className="legend-dot" style={{ backgroundColor: GROUP_STYLES[group].color }} />
+              <span className="legend-label">{GROUP_STYLES[group].label[language]}</span>
+            </div>
+          ))}
+          <label className="legend-filter-row">
+            <input
+              type="checkbox"
+              checked={hideFullEvents}
+              onChange={(e) => setHideFullEvents(e.target.checked)}
+            />
+            <span className="legend-label">
+              {UI_TEXT[language].hideFullFilter} ({events.filter(isFull).length})
+            </span>
+          </label>
+        </div>
 
-      {/* Language Setting */}
-      <div className="lang-toggle">
-        <button
-          className={`lang-btn ${language === 'ko' ? 'active' : ''}`}
-          onClick={() => handleSetLanguage('ko')}
-        >
-          한국어
-        </button>
-        <button
-          className={`lang-btn ${language === 'en' ? 'active' : ''}`}
-          onClick={() => handleSetLanguage('en')}
-        >
-          English
-        </button>
+        <div className="lang-toggle">
+          <button
+            className={`lang-btn ${language === 'ko' ? 'active' : ''}`}
+            onClick={() => handleSetLanguage('ko')}
+          >
+            한국어
+          </button>
+          <button
+            className={`lang-btn ${language === 'en' ? 'active' : ''}`}
+            onClick={() => handleSetLanguage('en')}
+          >
+            English
+          </button>
+        </div>
       </div>
 
-      {/* Category Color Legend */}
-      <div className="category-legend">
-        {(Object.keys(GROUP_STYLES) as CategoryGroup[]).map((group) => (
-          <div key={group} className="legend-row">
-            <span className="legend-dot" style={{ backgroundColor: GROUP_STYLES[group].color }} />
-            <span className="legend-label">{GROUP_STYLES[group].label[language]}</span>
-          </div>
-        ))}
-        <label className="legend-filter-row">
-          <input
-            type="checkbox"
-            checked={hideFullEvents}
-            onChange={(e) => setHideFullEvents(e.target.checked)}
-          />
-          <span className="legend-label">{UI_TEXT[language].hideFullFilter}</span>
-        </label>
-      </div>
+      {/* Top-right overlay stack: GPS button + badges, same reasoning as above. */}
+      <div className="overlay-stack overlay-stack-right">
+        <button
+          className="gps-button"
+          onClick={handleLocate}
+          disabled={isLocating}
+          title={UI_TEXT[language].recenterTitle}
+          aria-label={UI_TEXT[language].recenterTitle}
+        >
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            width="20"
+            height="20"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            className={isLocating ? 'spinning' : ''}
+          >
+            <line x1="2" x2="5" y1="12" y2="12" />
+            <line x1="19" x2="22" y1="12" y2="12" />
+            <line x1="12" x2="12" y1="2" y2="5" />
+            <line x1="12" x2="12" y1="19" y2="22" />
+            <circle cx="12" cy="12" r="7" />
+            <circle cx="12" cy="12" r="3" />
+          </svg>
+        </button>
 
-      {/* Gamification Badges Overlay */}
-      <div className="badge-overlay">
-        <h3 className="badge-overlay-title">{UI_TEXT[language].badgesTitle}</h3>
-        {clickedCount >= 1 ? (
-          <div className="badge-item unlocked">
-            <div className="badge-icon">🌟</div>
-            <div className="badge-info">
-              <span className="badge-name">{UI_TEXT[language].badgeName}</span>
-              <span className="badge-desc">{UI_TEXT[language].badgeDescUnlocked}</span>
+        {/* Gamification Badges Overlay */}
+        <div className="badge-overlay">
+          <h3 className="badge-overlay-title">{UI_TEXT[language].badgesTitle}</h3>
+          {clickedCount >= 1 ? (
+            <div className="badge-item unlocked">
+              <div className="badge-icon">🌟</div>
+              <div className="badge-info">
+                <span className="badge-name">{UI_TEXT[language].badgeName}</span>
+                <span className="badge-desc">{UI_TEXT[language].badgeDescUnlocked}</span>
+              </div>
             </div>
-          </div>
-        ) : (
-          <div className="badge-item locked">
-            <div className="badge-icon">🔒</div>
-            <div className="badge-info">
-              <span className="badge-name">{UI_TEXT[language].badgeName}</span>
-              <span className="badge-desc">{UI_TEXT[language].badgeDescLocked}</span>
+          ) : (
+            <div className="badge-item locked">
+              <div className="badge-icon">🔒</div>
+              <div className="badge-info">
+                <span className="badge-name">{UI_TEXT[language].badgeName}</span>
+                <span className="badge-desc">{UI_TEXT[language].badgeDescLocked}</span>
+              </div>
             </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
       {/* Selected Event Floating Overlay Card */}
@@ -604,6 +640,11 @@ export default function MapComponent() {
             <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
               <strong>{UI_TEXT[language].address}</strong> {display.address || UI_TEXT[language].notAvailable}
             </div>
+            {(selectedEvent.recruitStartDate || selectedEvent.recruitEndDate) && (
+              <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
+                <strong>{UI_TEXT[language].recruitPeriod}</strong> {selectedEvent.recruitStartDate || '?'} ~ {selectedEvent.recruitEndDate || '?'}
+              </div>
+            )}
             {(selectedEvent.startDate || selectedEvent.endDate) && (
               <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
                 <strong>{UI_TEXT[language].when}</strong> {selectedEvent.startDate || '?'} ~ {selectedEvent.endDate || '?'}
@@ -629,6 +670,11 @@ export default function MapComponent() {
               <button className="btn-share" onClick={handleShare}>
                 {shareStatus === 'copied' ? UI_TEXT[language].linkCopied : UI_TEXT[language].share}
               </button>
+              {selectedEvent.location && (
+                <button className="btn-directions" onClick={handleDirections}>
+                  {UI_TEXT[language].directions}
+                </button>
+              )}
             </div>
             {selectedEvent.externalUrl && (
               <a

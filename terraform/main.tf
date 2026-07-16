@@ -71,6 +71,11 @@ resource "google_cloud_run_v2_service" "default" {
         value = var.data_go_kr_api_key
       }
 
+      env {
+        name  = "NEXT_PUBLIC_KAKAO_MAP_APP_KEY"
+        value = var.kakao_map_app_key
+      }
+
       ports {
         container_port = 3000
       }

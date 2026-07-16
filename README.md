@@ -68,7 +68,7 @@ flowchart LR
     %% Frontend Subgraph
     subgraph Frontend ["🖥️ Next.js Client"]
         direction TB
-        Map("🗺️ Google Maps UI"):::frontend
+        Map("🗺️ Kakao Maps UI"):::frontend
         ChatUI("💬 Gemini Chat UI"):::frontend
     end
     
@@ -101,7 +101,7 @@ flowchart LR
         direction TB
         Gov("🏛️ 1365 Portal"):::extNode
         Gem("✨ Gemini 1.5 Flash"):::extNode
-        GMap("📍 Google Maps API"):::extNode
+        GMap("📍 Kakao Maps API"):::extNode
     end
     
     %% Flows & Connections
@@ -130,7 +130,7 @@ flowchart LR
 
 ## 🚀 Technology Stack
 *   **Framework:** Next.js 14 (App Router)
-*   **Mapping:** Google Maps JavaScript API
+*   **Mapping:** Kakao Maps JavaScript SDK
 *   **AI:** Gemini AI (Flash)
 *   **Infrastructure:** Google Cloud Platform (Cloud Run, Secret Manager)
 *   **Observability:** GCP Cloud Logging, Cloud Monitoring, Cloud Trace
@@ -141,7 +141,7 @@ flowchart LR
 ### Prerequisites
 - Node.js 18+
 - Google Cloud Account
-- API Keys: Google Maps, Gemini AI, `data.go.kr`
+- API Keys: Kakao Maps, Gemini AI, `data.go.kr`
 
 ### Setup
 1. **Clone the repository:**
