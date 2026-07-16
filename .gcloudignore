@@ -1,0 +1,9 @@
+.git/
+.gitignore
+terraform/
+docs/
+schema/
+web/node_modules/
+web/.next/
+web/coverage/
+web/.env*
