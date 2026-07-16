@@ -2,12 +2,107 @@
   "events": [
     {
       "id": "1365-1001",
-      "title": "한강 공원 쓰레기 줍기",
-      "translatedTitle": "Han River Park Cleanup",
+      "title": "여의도 한강공원 쓰레기 줍기",
+      "translatedTitle": "Yeouido Han River Park Cleanup",
       "organization": "Seoul Environment Group",
       "category": "Environment",
       "status": "Recruiting",
-      "location": { "lat": 37.528, "lng": 126.934, "address": "Yeouido Han River Park" }
+      "location": {
+        "lat": 37.528,
+        "lng": 126.934,
+        "address": "Yeouido Han River Park"
+      }
+    },
+    {
+      "id": "1365-1002",
+      "title": "남산 공원 숲 가꾸기",
+      "translatedTitle": "Namsan Park Forest Tending",
+      "organization": "Namsan Nature Conservancy",
+      "category": "Environment",
+      "status": "Recruiting",
+      "location": {
+        "lat": 37.5511,
+        "lng": 126.9882,
+        "address": "Namsan Park, Seoul"
+      }
+    },
+    {
+      "id": "1365-1003",
+      "title": "강남역 주말 거리 정화 활동",
+      "translatedTitle": "Gangnam Station Weekend Street Cleanup",
+      "organization": "Gangnam Youth Volunteers",
+      "category": "Community",
+      "status": "Recruiting",
+      "location": {
+        "lat": 37.4979,
+        "lng": 127.0276,
+        "address": "Gangnam Station, Seoul"
+      }
+    },
+    {
+      "id": "1365-1004",
+      "title": "경복궁 외국인 관광객 문화 안내",
+      "translatedTitle": "Gyeongbokgung Foreign Tourist Culture Guide",
+      "organization": "Korean Heritage Foundation",
+      "category": "Education",
+      "status": "Recruiting",
+      "location": {
+        "lat": 37.5796,
+        "lng": 126.9770,
+        "address": "Gyeongbokgung Palace, Seoul"
+      }
+    },
+    {
+      "id": "1365-1005",
+      "title": "홍대입구 청년 멘토링 프로그램",
+      "translatedTitle": "Hongdae Youth Mentoring Program",
+      "organization": "Mapo Youth Center",
+      "category": "Education",
+      "status": "Recruiting",
+      "location": {
+        "lat": 37.5556,
+        "lng": 126.9213,
+        "address": "Hongdae, Seoul"
+      }
+    },
+    {
+      "id": "1365-1006",
+      "title": "올림픽공원 자선 마라톤 대회 지원",
+      "translatedTitle": "Olympic Park Charity Marathon Support",
+      "organization": "Seoul Sports Association",
+      "category": "Event Support",
+      "status": "Recruiting",
+      "location": {
+        "lat": 37.5206,
+        "lng": 127.1214,
+        "address": "Olympic Park, Seoul"
+      }
+    },
+    {
+      "id": "1365-1007",
+      "title": "청계천 야간 순찰 및 안전 점검",
+      "translatedTitle": "Cheonggyecheon Night Patrol & Safety Check",
+      "organization": "Seoul Citizen Watch",
+      "category": "Safety",
+      "status": "Recruiting",
+      "location": {
+        "lat": 37.5693,
+        "lng": 127.0016,
+        "address": "Cheonggyecheon, Seoul"
+      }
+    },
+    {
+      "id": "1365-1008",
+      "title": "이태원 글로벌 문화 축제 통역 봉사",
+      "translatedTitle": "Itaewon Global Culture Festival Translation",
+      "organization": "Yongsan Multicultural Center",
+      "category": "Community",
+      "status": "Recruiting",
+      "location": {
+        "lat": 37.5345,
+        "lng": 126.9946,
+        "address": "Itaewon, Seoul"
+      }
     }
   ]
 }

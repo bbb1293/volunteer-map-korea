@@ -1,0 +1,6 @@
+project_id          = "kr-ai-hackathon26gmp-2258"
+region              = "asia-northeast3" # Seoul
+map_id              = "DEMO_MAP_ID"
+google_maps_api_key = "YOUR_GOOGLE_MAPS_API_KEY"
+gemini_api_key      = "YOUR_GEMINI_API_KEY"
+data_go_kr_api_key  = "YOUR_DATA_GO_KR_API_KEY"

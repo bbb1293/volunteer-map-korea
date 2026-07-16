@@ -3,26 +3,36 @@ import mockData from '@/data/seoul_volunteers.json';
 
 export async function POST(request: Request) {
   try {
-    const { eventId, lang } = await request.json();
-    const event = mockData.events.find((e: { id: string; translatedTitle?: string; title: string; organization?: string }) => e.id === eventId);
-    if (!event) {
-      return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+    const { eventId, lang, title, organization } = await request.json();
+    
+    let eventTitle = title;
+    let eventOrg = organization;
+    let fallbackTranslatedTitle: string | undefined = undefined;
+
+    if (!eventTitle) {
+      const event = mockData.events.find((e: { id: string; translatedTitle?: string; title: string; organization?: string }) => e.id === eventId);
+      if (!event) {
+        return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+      }
+      eventTitle = event.title;
+      eventOrg = event.organization;
+      fallbackTranslatedTitle = event.translatedTitle;
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
       // Fallback for development if API key is not configured
       return NextResponse.json({
-        title: event.translatedTitle || event.title,
-        organization: event.organization,
+        title: fallbackTranslatedTitle || eventTitle,
+        organization: eventOrg,
       });
     }
 
     const prompt = `Translate the following volunteer event info into ${lang || 'English'}. Return ONLY a JSON object with keys "title" and "organization", nothing else. Do not wrap the response in markdown blocks.
-Title: ${event.title}
-Organization: ${event.organization}`;
+Title: ${eventTitle}
+Organization: ${eventOrg}`;
 
-    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+    const geminiUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.5-flash:generateContent?key=${apiKey}`;
 
     const response = await fetch(geminiUrl, {
       method: 'POST',

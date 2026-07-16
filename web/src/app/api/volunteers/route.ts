@@ -1,6 +1,9 @@
 import { NextResponse } from 'next/server';
 import mockData from '@/data/seoul_volunteers.json';
 
+// In-memory geocoding cache to avoid redundant expensive API lookups
+const geocodeCache = new Map<string, { lat: number; lng: number } | null>();
+
 // Helper to decode basic XML entities and strip CDATA
 function decodeXmlEntities(str: string): string {
   let val = str.trim();
@@ -21,7 +24,7 @@ function decodeXmlEntities(str: string): string {
 
 // Extract tag value safely
 function extractTagValue(xml: string, tagName: string): string {
-  const regex = new RegExp(`<${tagName}>([\\s\\S]*?)<\/${tagName}>`, 'i');
+  const regex = new RegExp('<' + tagName + '\\b[^>]*>([\\s\\S]*?)</' + tagName + '>', 'i');
   const match = xml.match(regex);
   if (!match) return '';
   return decodeXmlEntities(match[1]);
@@ -43,18 +46,24 @@ async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutM
 
 // Geocode helper
 async function geocodeAddress(address: string, googleKey: string): Promise<{ lat: number; lng: number } | null> {
+  if (geocodeCache.has(address)) {
+    return geocodeCache.get(address) ?? null;
+  }
   try {
     const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(address)}&key=${googleKey}`;
     const response = await fetchWithTimeout(url, {}, 5000);
     if (!response.ok) {
       console.warn(`Geocoding HTTP error: ${response.status} ${response.statusText}`);
+      geocodeCache.set(address, null);
       return null;
     }
     const data = await response.json();
     if (data.status === 'OK' && data.results && data.results[0]?.geometry?.location) {
       const loc = data.results[0].geometry.location;
       if (typeof loc.lat === 'number' && typeof loc.lng === 'number') {
-        return { lat: loc.lat, lng: loc.lng };
+        const coords = { lat: loc.lat, lng: loc.lng };
+        geocodeCache.set(address, coords);
+        return coords;
       }
     } else {
       console.warn(`Geocoding failed for address "${address}": status is ${data.status}`);
@@ -62,6 +71,7 @@ async function geocodeAddress(address: string, googleKey: string): Promise<{ lat
   } catch (error) {
     console.error(`Geocoding exception for address "${address}":`, error);
   }
+  geocodeCache.set(address, null);
   return null;
 }
 
@@ -96,7 +106,7 @@ export async function GET() {
 
     // 4. Parse XML items
     const items: string[] = [];
-    const itemRegex = /<item>([\s\S]*?)<\/item>/g;
+    const itemRegex = /<item\b[^>]*>([\s\S]*?)<\/item>/gi;
     let match;
     while ((match = itemRegex.exec(xmlText)) !== null) {
       items.push(match[1]);

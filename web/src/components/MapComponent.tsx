@@ -162,6 +162,8 @@ export default function MapComponent() {
         },
         body: JSON.stringify({
           eventId: selectedEvent.id,
+          title: selectedEvent.title,
+          organization: selectedEvent.organization,
           lang: 'English',
         }),
       });
