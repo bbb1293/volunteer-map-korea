@@ -420,6 +420,20 @@ body {
   transform: scale(0.98);
 }
 
+.card-external-link {
+  display: block;
+  text-align: center;
+  margin-top: 10px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #2563eb;
+  text-decoration: none;
+}
+
+.card-external-link:hover {
+  text-decoration: underline;
+}
+
 /* Current Position "You Are Here" Marker */
 .user-position-pin {
   position: relative;

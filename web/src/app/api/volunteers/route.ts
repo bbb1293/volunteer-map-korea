@@ -32,6 +32,20 @@ const CATEGORY_NAMES: Record<string, string> = {
   '온라인자원봉사': 'Online Volunteering',
 };
 
+// Formats a YYYYMMDD date string (e.g. "20260511") into "2026.05.11".
+function formatDate(raw: string | undefined): string | undefined {
+  if (!raw || raw.length !== 8) return undefined;
+  return `${raw.slice(0, 4)}.${raw.slice(4, 6)}.${raw.slice(6, 8)}`;
+}
+
+// Formats an hour string (e.g. "8", "16") into "08:00".
+function formatTime(raw: string | undefined): string | undefined {
+  if (!raw) return undefined;
+  const hour = parseInt(raw, 10);
+  if (isNaN(hour) || hour < 0 || hour > 24) return undefined;
+  return `${String(hour).padStart(2, '0')}:00`;
+}
+
 // Parses the government API's "위도,경도" coordinate string (delimiter observed
 // to vary, so accept comma/semicolon/whitespace) into { lat, lng }.
 function parseAreaLalo(raw: string | undefined): { lat: number; lng: number } | null {
@@ -174,6 +188,11 @@ export async function GET() {
       const address = extractTagValue(itemXml, 'actPlace');
       const categoryCode = extractTagValue(itemXml, 'srvcClCode');
       const category = CATEGORY_NAMES[categoryCode] || categoryCode || 'Volunteer';
+      const startDate = formatDate(extractTagValue(itemXml, 'progrmBgnde'));
+      const endDate = formatDate(extractTagValue(itemXml, 'progrmEndde'));
+      const startTime = formatTime(extractTagValue(itemXml, 'actBeginTm'));
+      const endTime = formatTime(extractTagValue(itemXml, 'actEndTm'));
+      const externalUrl = extractTagValue(itemXml, 'url') || undefined;
 
       if (!id || !title) {
         return null;
@@ -212,6 +231,11 @@ export async function GET() {
         organization: organization || undefined,
         category,
         status: 'Recruiting',
+        startDate,
+        endDate,
+        startTime,
+        endTime,
+        externalUrl,
         location: {
           lat: coords.lat,
           lng: coords.lng,

@@ -8,6 +8,11 @@ interface VolunteerEvent {
   organization?: string;
   category?: string;
   status?: string;
+  startDate?: string;
+  endDate?: string;
+  startTime?: string;
+  endTime?: string;
+  externalUrl?: string;
   location?: {
     lat: number;
     lng: number;
@@ -87,6 +92,9 @@ const UI_TEXT = {
     share: 'Share',
     linkCopied: 'Link Copied!',
     recenterTitle: 'Recenter Map to My Location',
+    when: 'When:',
+    dailyTime: 'Daily time:',
+    viewOriginal: 'View Original Listing ↗',
   },
   ko: {
     badgesTitle: '봉사활동 임팩트 배지',
@@ -101,6 +109,9 @@ const UI_TEXT = {
     share: '공유',
     linkCopied: '링크 복사됨!',
     recenterTitle: '내 위치로 이동',
+    when: '기간:',
+    dailyTime: '활동 시간:',
+    viewOriginal: '1365 포털에서 원본 보기 ↗',
   },
 };
 
@@ -540,11 +551,31 @@ export default function MapComponent() {
             <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
               <strong>{UI_TEXT[language].address}</strong> {display.address || UI_TEXT[language].notAvailable}
             </div>
+            {(selectedEvent.startDate || selectedEvent.endDate) && (
+              <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
+                <strong>{UI_TEXT[language].when}</strong> {selectedEvent.startDate || '?'} ~ {selectedEvent.endDate || '?'}
+              </div>
+            )}
+            {(selectedEvent.startTime || selectedEvent.endTime) && (
+              <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
+                <strong>{UI_TEXT[language].dailyTime}</strong> {selectedEvent.startTime || '?'} - {selectedEvent.endTime || '?'}
+              </div>
+            )}
             <div className="card-actions">
               <button className="btn-share" onClick={handleShare}>
                 {shareStatus === 'copied' ? UI_TEXT[language].linkCopied : UI_TEXT[language].share}
               </button>
             </div>
+            {selectedEvent.externalUrl && (
+              <a
+                className="card-external-link"
+                href={selectedEvent.externalUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                {UI_TEXT[language].viewOriginal}
+              </a>
+            )}
           </div>
         );
       })()}
