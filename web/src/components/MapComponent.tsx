@@ -47,8 +47,8 @@ export default function MapComponent() {
               data.events.forEach((event: VolunteerEvent) => {
                 if (
                   event.location &&
-                  typeof event.location.lat === 'number' &&
-                  typeof event.location.lng === 'number'
+                  typeof event.location.lat === 'number' && !isNaN(event.location.lat) &&
+                  typeof event.location.lng === 'number' && !isNaN(event.location.lng)
                 ) {
                   const marker = new google.maps.marker.AdvancedMarkerElement({
                     map: newMap,
@@ -85,6 +85,7 @@ export default function MapComponent() {
     return () => {
       active = false;
       if (timerId) clearTimeout(timerId);
+      mapInitialized.current = false; // Reset to support Strict Mode remounts
     };
   }, []);
 
