@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
 import type { VolunteerEvent } from '@/types/volunteerEvent';
+import { decodeWeekdays } from '@/lib/weekday';
 
 // Category -> group mapping. Each of the ~16 API categories folds into one of
 // 5 groups so the map uses a validated 4-hue categorical palette (+ neutral
@@ -95,6 +96,12 @@ const UI_TEXT = {
     hideFullFilter: 'Hide filled opportunities',
     directions: 'Directions',
     myLocation: 'My Location',
+    familyOk: 'Family OK',
+    groupOk: 'Group OK',
+    youthOk: 'Youth OK',
+    adultsOnly: 'Adults Only',
+    schedule: 'Schedule:',
+    contact: 'Contact:',
   },
   ko: {
     badgesTitle: '봉사활동 임팩트 배지',
@@ -118,6 +125,12 @@ const UI_TEXT = {
     hideFullFilter: '마감된 활동 숨기기',
     directions: '길찾기',
     myLocation: '내 위치',
+    familyOk: '가족 참여 가능',
+    groupOk: '단체 참여 가능',
+    youthOk: '청소년 참여 가능',
+    adultsOnly: '성인만 가능',
+    schedule: '활동 요일:',
+    contact: '연락처:',
   },
 };
 
@@ -664,6 +677,16 @@ export default function MapComponent() {
                 </span>
               )}
             </div>
+            {(selectedEvent.familyPosblAt === 'Y' || selectedEvent.grpPosblAt === 'Y' || selectedEvent.pbsvntPosblAt === 'Y' || (selectedEvent.adultPosblAt === 'Y' && selectedEvent.yngbgsPosblAt !== 'Y')) && (
+              <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', margin: '4px 0 8px 0' }}>
+                {selectedEvent.familyPosblAt === 'Y' && <span className="eligibility-badge">{UI_TEXT[language].familyOk}</span>}
+                {selectedEvent.grpPosblAt === 'Y' && <span className="eligibility-badge">{UI_TEXT[language].groupOk}</span>}
+                {selectedEvent.pbsvntPosblAt === 'Y' && <span className="eligibility-badge">{UI_TEXT[language].youthOk}</span>}
+                {selectedEvent.adultPosblAt === 'Y' && selectedEvent.yngbgsPosblAt !== 'Y' && (
+                  <span className="eligibility-badge">{UI_TEXT[language].adultsOnly}</span>
+                )}
+              </div>
+            )}
             <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
               <strong>{UI_TEXT[language].org}</strong> {display.organization || UI_TEXT[language].notAvailable}
             </div>
@@ -685,6 +708,11 @@ export default function MapComponent() {
                 <strong>{UI_TEXT[language].dailyTime}</strong> {selectedEvent.startTime || '?'} - {selectedEvent.endTime || '?'}
               </div>
             )}
+            {decodeWeekdays(selectedEvent.actWkdy, language) && (
+              <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
+                <strong>{UI_TEXT[language].schedule}</strong> {decodeWeekdays(selectedEvent.actWkdy, language)}
+              </div>
+            )}
             {typeof selectedEvent.spotsNeeded === 'number' && (
               <div style={{ fontSize: '14px', margin: '4px 0', color: '#475569' }}>
                 <strong>{UI_TEXT[language].spotsFilled}</strong> {selectedEvent.spotsFilled ?? 0} / {selectedEvent.spotsNeeded}
@@ -694,6 +722,14 @@ export default function MapComponent() {
               <div style={{ fontSize: '14px', margin: '8px 0 4px 0', color: '#475569' }}>
                 <strong>{UI_TEXT[language].description}</strong>
                 <p className="card-description">{display.description}</p>
+              </div>
+            )}
+            {(selectedEvent.email || selectedEvent.telno) && (
+              <div style={{ fontSize: '14px', margin: '4px 0 8px 0', color: '#475569' }}>
+                <strong>{UI_TEXT[language].contact}</strong>{' '}
+                {selectedEvent.telno && <a href={`tel:${selectedEvent.telno}`}>{selectedEvent.telno}</a>}
+                {selectedEvent.telno && selectedEvent.email && ' · '}
+                {selectedEvent.email && <a href={`mailto:${selectedEvent.email}`}>{selectedEvent.email}</a>}
               </div>
             )}
             <div className="card-actions">
