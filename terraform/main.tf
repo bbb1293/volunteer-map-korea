@@ -55,20 +55,10 @@ resource "google_cloud_run_v2_service" "default" {
         name  = "NEXT_PUBLIC_MAP_ID"
         value = var.map_id
       }
-      
-      env {
-        name  = "GOOGLE_MAPS_API_KEY"
-        value = var.google_maps_api_key
-      }
 
       env {
         name  = "GEMINI_API_KEY"
         value = var.gemini_api_key
-      }
-
-      env {
-        name  = "DATA_GO_KR_API_KEY"
-        value = var.data_go_kr_api_key
       }
 
       env {
@@ -92,4 +82,14 @@ resource "google_cloud_run_service_iam_member" "public_access" {
   service  = google_cloud_run_v2_service.default.name
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+resource "google_project_iam_member" "web_firestore_reader" {
+  project = var.project_id
+  role    = "roles/datastore.viewer"
+  member  = "serviceAccount:${data.google_compute_default_service_account.default.email}"
+}
+
+data "google_compute_default_service_account" "default" {
+  project = var.project_id
 }
