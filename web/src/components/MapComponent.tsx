@@ -1,29 +1,6 @@
 'use client';
 import { useEffect, useRef, useState } from 'react';
-
-interface VolunteerEvent {
-  id: string;
-  title: string;
-  translatedTitle?: string;
-  organization?: string;
-  category?: string;
-  status?: string;
-  startDate?: string;
-  endDate?: string;
-  startTime?: string;
-  endTime?: string;
-  recruitStartDate?: string;
-  recruitEndDate?: string;
-  externalUrl?: string;
-  description?: string;
-  spotsNeeded?: number;
-  spotsFilled?: number;
-  location?: {
-    lat: number;
-    lng: number;
-    address?: string;
-  };
-}
+import type { VolunteerEvent } from '@/types/volunteerEvent';
 
 // Category -> group mapping. Each of the ~16 API categories folds into one of
 // 5 groups so the map uses a validated 4-hue categorical palette (+ neutral
@@ -169,6 +146,95 @@ export default function MapComponent() {
     let timerId: NodeJS.Timeout;
     let loadScheduled = false;
 
+    const ZOOM_CUTOFF_LEVEL = 9; // Kakao's 1-14 scale; below city/metro zoom, don't query or render pins.
+    const markerById = new Map<string, { marker: kakao.maps.CustomOverlay; event: VolunteerEvent }>();
+    let debounceTimer: NodeJS.Timeout;
+
+    const clearAllMarkers = () => {
+      markerById.forEach(({ marker }) => marker.setMap(null));
+      markerById.clear();
+      markersRef.current = [];
+    };
+
+    const renderEvents = (fetchedEvents: VolunteerEvent[], currentMap: kakao.maps.Map) => {
+      clearAllMarkers();
+      setEvents(fetchedEvents);
+      fetchedEvents.forEach((event) => {
+        if (
+          !event.location ||
+          typeof event.location.lat !== 'number' || isNaN(event.location.lat) ||
+          typeof event.location.lng !== 'number' || isNaN(event.location.lng)
+        ) {
+          return;
+        }
+
+        const pinContainer = document.createElement('div');
+        pinContainer.className = 'custom-map-pin';
+        pinContainer.title = event.translatedTitle || event.title;
+        const groupStyle = GROUP_STYLES[getCategoryGroup(event.category)];
+        const pinColor = groupStyle.color;
+        pinContainer.style.setProperty('--pin-color', pinColor);
+
+        const svgIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">${groupStyle.icon}</svg>`;
+
+        pinContainer.innerHTML = `
+          <div class="pin-pulse" style="background-color: ${pinColor}"></div>
+          <div class="pin-core" style="background-color: ${pinColor}">
+            ${svgIcon}
+          </div>
+        `;
+
+        const marker = new kakao.maps.CustomOverlay({
+          map: (hideFullRef.current && isFull(event)) ? null : currentMap,
+          position: new kakao.maps.LatLng(event.location.lat, event.location.lng),
+          content: pinContainer,
+          xAnchor: 0.5,
+          yAnchor: 0.5,
+          zIndex: 1,
+        });
+
+        markerById.set(event.id, { marker, event });
+        markersRef.current.push({ marker, event });
+
+        pinContainer.addEventListener('click', () => {
+          setSelectedEvent(event);
+          setShareStatus('idle');
+          setClickedCount((prev) => prev + 1);
+        });
+      });
+    };
+
+    const fetchViewport = (currentMap: kakao.maps.Map) => {
+      if (currentMap.getLevel() >= ZOOM_CUTOFF_LEVEL) {
+        clearAllMarkers();
+        setEvents([]);
+        return;
+      }
+
+      const bounds = currentMap.getBounds();
+      const sw = bounds.getSouthWest();
+      const ne = bounds.getNorthEast();
+      const params = new URLSearchParams({
+        swLat: String(sw.getLat()),
+        swLng: String(sw.getLng()),
+        neLat: String(ne.getLat()),
+        neLng: String(ne.getLng()),
+      });
+
+      fetch(`/api/volunteers?${params.toString()}`)
+        .then((res) => res.json())
+        .then((data) => {
+          if (!active) return;
+          if (data && Array.isArray(data.events)) {
+            renderEvents(data.events, currentMap);
+          }
+        })
+        .catch((err) => {
+          if (!active) return;
+          console.error('Failed to fetch volunteer data:', err);
+        });
+    };
+
     const buildMap = () => {
       if (!active || !mapRef.current || mapInitialized.current) return;
 
@@ -179,72 +245,32 @@ export default function MapComponent() {
       setMap(newMap);
       mapInitialized.current = true;
 
-      fetch('/api/volunteers')
-        .then((res) => res.json())
-        .then((data) => {
-          if (!active) return;
-          if (data && Array.isArray(data.events)) {
-            setEvents(data.events);
-            data.events.forEach((event: VolunteerEvent) => {
-              if (
-                event.location &&
-                typeof event.location.lat === 'number' && !isNaN(event.location.lat) &&
-                typeof event.location.lng === 'number' && !isNaN(event.location.lng)
-              ) {
-                const pinContainer = document.createElement('div');
-                pinContainer.className = 'custom-map-pin';
-                pinContainer.title = event.translatedTitle || event.title;
-                const groupStyle = GROUP_STYLES[getCategoryGroup(event.category)];
-                const pinColor = groupStyle.color;
-                pinContainer.style.setProperty('--pin-color', pinColor);
+      kakao.maps.event.addListener(newMap, 'idle', () => {
+        clearTimeout(debounceTimer);
+        debounceTimer = setTimeout(() => fetchViewport(newMap), 400);
+      });
 
-                const svgIcon = `<svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="width: 14px; height: 14px;">${groupStyle.icon}</svg>`;
+      fetchViewport(newMap);
 
-                pinContainer.innerHTML = `
-                  <div class="pin-pulse" style="background-color: ${pinColor}"></div>
-                  <div class="pin-core" style="background-color: ${pinColor}">
-                    ${svgIcon}
-                  </div>
-                `;
-
-                const marker = new kakao.maps.CustomOverlay({
-                  map: (hideFullRef.current && isFull(event)) ? null : newMap,
-                  position: new kakao.maps.LatLng(event.location.lat, event.location.lng),
-                  content: pinContainer,
-                  xAnchor: 0.5,
-                  yAnchor: 0.5,
-                  zIndex: 1,
-                });
-
-                markersRef.current.push({ marker, event });
-
-                pinContainer.addEventListener('click', () => {
-                  setSelectedEvent(event);
-                  setShareStatus('idle');
-                  setClickedCount((prev) => prev + 1);
-                });
-              }
-            });
-
-            // If this page was opened via a shared link (?event=<id>), open
-            // that event's card and center the map on it instead of the
-            // default/geolocation center.
-            const sharedId = new URLSearchParams(window.location.search).get('event');
-            if (sharedId) {
-              const sharedEvent = data.events.find((e: VolunteerEvent) => e.id === sharedId);
-              if (sharedEvent?.location) {
-                setSelectedEvent(sharedEvent);
-                newMap.setCenter(new kakao.maps.LatLng(sharedEvent.location.lat, sharedEvent.location.lng));
-                newMap.setLevel(3);
-                hasCenteredOnUser.current = true; // don't let geolocation override the shared spot
-              }
+      // If this page was opened via a shared link (?event=<id>), fetch that
+      // one event directly (its own tight bounding box) so it's shown even
+      // if it falls outside the default Seoul-centered viewport.
+      const sharedId = new URLSearchParams(window.location.search).get('event');
+      if (sharedId) {
+        fetch(`/api/volunteers?swLat=33&swLng=124&neLat=39&neLng=132`)
+          .then((res) => res.json())
+          .then((data) => {
+            if (!active || !Array.isArray(data?.events)) return;
+            const sharedEvent = data.events.find((e: VolunteerEvent) => e.id === sharedId);
+            if (sharedEvent?.location) {
+              setSelectedEvent(sharedEvent);
+              newMap.setCenter(new kakao.maps.LatLng(sharedEvent.location.lat, sharedEvent.location.lng));
+              newMap.setLevel(3);
+              hasCenteredOnUser.current = true;
             }
-          }
-        })
-        .catch((err) => {
-          if (!active) return;
-          console.error('Failed to fetch volunteer data:', err);
-        });
+          })
+          .catch((err) => console.error('Failed to fetch shared event:', err));
+      }
     };
 
     const tryInit = () => {
@@ -269,11 +295,9 @@ export default function MapComponent() {
     return () => {
       active = false;
       if (timerId) clearTimeout(timerId);
+      clearTimeout(debounceTimer);
       mapInitialized.current = false; // Reset to support Strict Mode remounts
-      markersRef.current.forEach(({ marker }) => {
-        marker.setMap(null);
-      });
-      markersRef.current = [];
+      clearAllMarkers();
     };
   }, []);
 
@@ -516,6 +540,12 @@ export default function MapComponent() {
   return (
     <div style={{ position: 'relative', width: '100%', height: '100vh' }}>
       <div ref={mapRef} style={{ width: '100%', height: '100%' }} />
+
+      {map && map.getLevel() >= 9 && (
+        <div className="zoom-prompt">
+          {language === 'ko' ? '자원봉사 활동을 보려면 확대하세요' : 'Zoom in to see volunteer opportunities'}
+        </div>
+      )}
 
       {/* Top-left overlay stack: category legend + language toggle. Grouped in
           one flex column so they stack in normal document flow instead of

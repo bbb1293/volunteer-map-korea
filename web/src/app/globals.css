@@ -545,3 +545,26 @@ body {
   transform-origin: center;
 }
 
+.zoom-prompt {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(255, 255, 255, 0.9);
+  padding: 12px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #334155;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  z-index: 999;
+  pointer-events: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  .zoom-prompt {
+    background: rgba(30, 30, 30, 0.9);
+    color: #e2e8f0;
+  }
+}
+
