@@ -11,6 +11,11 @@ declare namespace kakao {
       getLng(): number;
     }
 
+    class LatLngBounds {
+      getSouthWest(): LatLng;
+      getNorthEast(): LatLng;
+    }
+
     interface MapOptions {
       center: LatLng;
       level: number;
@@ -23,6 +28,15 @@ declare namespace kakao {
       setLevel(level: number): void;
       getLevel(): number;
       panTo(latlng: LatLng): void;
+      getBounds(): LatLngBounds;
+    }
+
+    namespace event {
+      function addListener(
+        target: object,
+        type: string,
+        handler: (...args: unknown[]) => void
+      ): void;
     }
 
     interface CustomOverlayOptions {

@@ -43,7 +43,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test src",
+    "test": "node --test src/*.test.ts",
     "typecheck": "tsc --noEmit",
     "start": "node src/index.ts"
   },
@@ -67,6 +67,7 @@
     "moduleResolution": "nodenext",
     "strict": true,
     "erasableSyntaxOnly": true,
+    "allowImportingTsExtensions": true,
     "noEmit": true,
     "esModuleInterop": true,
     "skipLibCheck": true
@@ -74,6 +75,8 @@
   "include": ["src/**/*.ts"]
 }
 ```
+
+`allowImportingTsExtensions` is required alongside `noEmit` because every relative import in this project uses an explicit `.ts` extension (Node's ESM loader requires it to run `.ts` files directly) — without this flag, `tsc --noEmit` rejects those extensions even though Node itself accepts them.
 
 - [ ] **Step 3: Create `sync-job/.gitignore`**
 
@@ -600,7 +603,7 @@ git commit -m "feat(sync-job): detail-fetch prioritization (new-first, then olde
 
 **Interfaces:**
 - Consumes: `extractItems`, `extractTagValue` from `./xml.ts` (Task 2).
-- Produces: `class CallBudgetExceededError extends Error`, `class DataGoKrClient` with `constructor(serviceKey: string, budget: number, fetchImpl?: typeof fetch)`, `fetchListPage(pageNo: number): Promise<{ items: string[]; totalCount: number }>`, `fetchDetail(id: string): Promise<string>`, `get callsMade(): number` — consumed by Task 8's orchestrator.
+- Produces: `class CallBudgetExceededError extends Error`, `class DataGoKrClient` with `constructor(serviceKey: string, budget: number, fetchImpl?: typeof fetch)`, `fetchListPage(pageNo: number): Promise<{ items: string[]; totalCount: number }>`, `fetchDetail(id: string): Promise<string>`, `get callsMade(): number`, `get remainingBudget(): number` — consumed by Task 8's orchestrator, which derives its phase-3 budget from `client.remainingBudget` rather than duplicating the `950` constant.
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -642,6 +645,11 @@ test('a call beyond the budget throws CallBudgetExceededError before making a re
   await assert.rejects(() => client.fetchListPage(2), CallBudgetExceededError);
   assert.equal(client.callsMade, 1);
 });
+
+test('remainingBudget reflects the budget minus calls made', () => {
+  const client = new DataGoKrClient('KEY', 10, fakeFetch({}));
+  assert.equal(client.remainingBudget, 10);
+});
 ```
 
 - [ ] **Step 2: Run tests to verify they fail**
@@ -678,6 +686,10 @@ export class DataGoKrClient {
 
   get callsMade(): number {
     return this.calls;
+  }
+
+  get remainingBudget(): number {
+    return this.budget - this.calls;
   }
 
   private async request(url: string): Promise<string> {
@@ -1040,7 +1052,7 @@ export async function runSync(
     if (!(error instanceof CallBudgetExceededError)) throw error;
   }
 
-  const remainingBudget = 950 - client.callsMade;
+  const remainingBudget = client.remainingBudget;
   let detailFetched = 0;
 
   if (remainingBudget > 0) {
@@ -1476,9 +1488,12 @@ git commit -m "feat(infra): build and deploy the sync job alongside the web serv
 **Interfaces:**
 - Produces: `interface VolunteerEvent` (shared client/server shape), `parseBoundingBox(searchParams: URLSearchParams): BoundingBox | null`, `queryEventsInBounds(bbox: BoundingBox): Promise<VolunteerEvent[]>` — consumed by Task 15's route handler and Task 17/18's `MapComponent.tsx`.
 
-- [ ] **Step 1: Add the Firestore dependency and a test runner script**
+- [ ] **Step 1: Add the Firestore dependency, ESM mode, and a test runner script**
 
-Edit `web/package.json`: add `"@google-cloud/firestore": "^7.11.0"` to `dependencies`, and add to `scripts`: `"test": "node --test src"` (Node's test runner recursively discovers `*.test.ts` files under a directory argument, so this also covers Task 16's `web/src/lib/weekday.test.ts`).
+Edit `web/package.json`:
+- Add `"@google-cloud/firestore": "^7.11.0"` to `dependencies`.
+- Add `"type": "module"` at the top level. Without it, `node --test` prints a `MODULE_TYPELESS_PACKAGE_JSON` warning on every `.test.ts` file (confirmed empirically) — noisy but not fatal; Next.js's own build/dev pipeline is unaffected by this field since it uses its own transpilation regardless.
+- Add to `scripts`: `"test": "node --test"`. Passing no path argument is required — passing a directory (e.g. `node --test src`) does NOT recursively discover tests and fails outright (confirmed empirically); only the bare, argument-less form's default recursive discovery finds nested files like Task 16's `web/src/lib/weekday.test.ts`.
 
 - [ ] **Step 2: Create the shared type**
 

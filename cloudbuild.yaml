@@ -1,20 +1,28 @@
 steps:
-  # Build the container image
   - name: 'gcr.io/cloud-builders/docker'
     args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-map-web:$COMMIT_SHA', './web']
-  
-  # Push the container image to Artifact Registry
+
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-map-web:$COMMIT_SHA']
-  
-  # Tag the image as latest
+
   - name: 'gcr.io/cloud-builders/docker'
     args: ['tag', '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-map-web:$COMMIT_SHA', '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-map-web:latest']
-    
+
   - name: 'gcr.io/cloud-builders/docker'
     args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-map-web:latest']
 
-  # Deploy container image to Cloud Run
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['build', '-t', '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-sync-job:$COMMIT_SHA', './sync-job']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-sync-job:$COMMIT_SHA']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['tag', '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-sync-job:$COMMIT_SHA', '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-sync-job:latest']
+
+  - name: 'gcr.io/cloud-builders/docker'
+    args: ['push', '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-sync-job:latest']
+
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: gcloud
     args:
@@ -26,9 +34,23 @@ steps:
       - '--region'
       - '${_REGION}'
 
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'jobs'
+      - 'update'
+      - 'volunteer-sync-job'
+      - '--image'
+      - '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-sync-job:latest'
+      - '--region'
+      - '${_REGION}'
+
 substitutions:
   _REGION: 'asia-northeast3'
 
 images:
   - '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-map-web:$COMMIT_SHA'
   - '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-map-web:latest'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-sync-job:$COMMIT_SHA'
+  - '${_REGION}-docker.pkg.dev/$PROJECT_ID/volunteer-map-repo/volunteer-sync-job:latest'

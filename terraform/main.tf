@@ -41,6 +41,11 @@ resource "google_artifact_registry_repository" "repo" {
 # using Cloud Build or a local provisioner. For this example, we assume
 # the image is built and pushed to the registry.
 
+resource "google_service_account" "web_service" {
+  account_id   = "volunteer-map-web"
+  display_name = "Volunteer Map web service"
+}
+
 # Cloud Run Service
 resource "google_cloud_run_v2_service" "default" {
   name     = "volunteer-map-service"
@@ -48,6 +53,8 @@ resource "google_cloud_run_v2_service" "default" {
   ingress  = "INGRESS_TRAFFIC_ALL"
 
   template {
+    service_account = google_service_account.web_service.email
+
     containers {
       image = "${var.region}-docker.pkg.dev/${var.project_id}/${google_artifact_registry_repository.repo.name}/volunteer-map-web:latest"
 
@@ -57,18 +64,8 @@ resource "google_cloud_run_v2_service" "default" {
       }
 
       env {
-        name  = "GOOGLE_MAPS_API_KEY"
-        value = var.google_maps_api_key
-      }
-
-      env {
         name  = "GEMINI_API_KEY"
         value = var.gemini_api_key
-      }
-
-      env {
-        name  = "DATA_GO_KR_API_KEY"
-        value = var.data_go_kr_api_key
       }
 
       env {
@@ -92,4 +89,10 @@ resource "google_cloud_run_service_iam_member" "public_access" {
   service  = google_cloud_run_v2_service.default.name
   role     = "roles/run.invoker"
   member   = "allUsers"
+}
+
+resource "google_project_iam_member" "web_firestore_reader" {
+  project = var.project_id
+  role    = "roles/datastore.viewer"
+  member  = "serviceAccount:${google_service_account.web_service.email}"
 }
