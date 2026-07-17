@@ -38,8 +38,13 @@ export async function runSync(
         const doc = mapListItem(itemXml, page, today);
         if (!doc?.id) continue;
         listDocs.set(doc.id, doc);
-        await repo.upsertDoc(doc as Partial<VolunteerDoc> & { id: string });
-        if (!existingIds.has(doc.id)) newIds.push(doc.id);
+        const isNew = !existingIds.has(doc.id);
+        await repo.upsertDoc(
+          isNew
+            ? ({ ...doc, lastDetailFetchAt: 0 } as Partial<VolunteerDoc> & { id: string })
+            : (doc as Partial<VolunteerDoc> & { id: string })
+        );
+        if (isNew) newIds.push(doc.id);
       }
       sweptPages += 1;
       page += 1;

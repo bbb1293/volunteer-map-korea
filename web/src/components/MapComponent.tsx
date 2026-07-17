@@ -677,11 +677,11 @@ export default function MapComponent() {
                 </span>
               )}
             </div>
-            {(selectedEvent.familyPosblAt === 'Y' || selectedEvent.grpPosblAt === 'Y' || selectedEvent.pbsvntPosblAt === 'Y' || (selectedEvent.adultPosblAt === 'Y' && selectedEvent.yngbgsPosblAt !== 'Y')) && (
+            {(selectedEvent.familyPosblAt === 'Y' || selectedEvent.grpPosblAt === 'Y' || selectedEvent.yngbgsPosblAt === 'Y' || (selectedEvent.adultPosblAt === 'Y' && selectedEvent.yngbgsPosblAt !== 'Y')) && (
               <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', margin: '4px 0 8px 0' }}>
                 {selectedEvent.familyPosblAt === 'Y' && <span className="eligibility-badge">{UI_TEXT[language].familyOk}</span>}
                 {selectedEvent.grpPosblAt === 'Y' && <span className="eligibility-badge">{UI_TEXT[language].groupOk}</span>}
-                {selectedEvent.pbsvntPosblAt === 'Y' && <span className="eligibility-badge">{UI_TEXT[language].youthOk}</span>}
+                {selectedEvent.yngbgsPosblAt === 'Y' && <span className="eligibility-badge">{UI_TEXT[language].youthOk}</span>}
                 {selectedEvent.adultPosblAt === 'Y' && selectedEvent.yngbgsPosblAt !== 'Y' && (
                   <span className="eligibility-badge">{UI_TEXT[language].adultsOnly}</span>
                 )}
